@@ -1,0 +1,9 @@
+**
+!lhmpp/
+!lhmpp/Dockerfile
+!vendors/
+!vendors/LHM-plusplus/
+!vendors/LHM-plusplus/**
+vendors/LHM-plusplus/.git
+**/__pycache__
+**/*.pyc

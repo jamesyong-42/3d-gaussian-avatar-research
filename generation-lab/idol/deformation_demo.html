@@ -1,0 +1,19 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>IDOL · Full deformation lab</title><style>
+*{box-sizing:border-box}body{margin:0;background:#f4f4ed;color:#1c3637;font:15px/1.5 system-ui,Segoe UI,sans-serif}header{padding:20px 32px;border-bottom:1px solid #d3ddd4;display:flex;justify-content:space-between;gap:15px}header span{font-size:11px;letter-spacing:.1em;text-transform:uppercase}main{max-width:1240px;margin:28px auto;display:grid;grid-template-columns:310px 1fr;gap:28px;padding:0 24px}h1{font:38px/1.1 Georgia,serif;margin:10px 0 18px}p{color:#607270}.note{padding:15px;background:#e6eee4;border-radius:8px;font-size:12px}label{display:block;margin:19px 0}input,select,button{font:inherit;width:100%;accent-color:#16674f}select,button{border:1px solid #becfc1;border-radius:6px;padding:9px;background:white;color:#1c3637}button{cursor:pointer;margin:5px 0}button.primary{background:#17664f;color:white;border-color:#17664f}output{float:right;font-size:12px;font-variant-numeric:tabular-nums}#viewport{background:white;border:1px solid #d3ddd4;border-radius:12px;min-height:650px;display:grid;place-items:center;overflow:hidden}canvas{display:block;max-width:100%;max-height:850px;width:auto;height:auto}#status{font-size:12px;overflow-wrap:anywhere;color:#376653}#error{color:#9b342d;font-size:13px}.small{font-size:11px}fieldset{border:0;padding:0;margin:0}@media(max-width:780px){main{grid-template-columns:1fr}#viewport{min-height:0}canvas{width:100%;max-height:none}header{padding:15px}h1{font-size:32px}}
+</style></head><body>
+<header><span>Gaussian Avatar Lab / IDOL deformation experiment</span><span>Local research · not the main web backend</span></header>
+<main><aside><h1>One avatar.<br>Live deformation.</h1>
+<p>CPU joint transforms → WebGPU correctives and skinning → fresh 3-neighbor sizes → full covariance → depth-sorted splats.</p>
+<p class="note">All geometry is recomputed from these signals. No cached animation frames. The default renderer keeps the live loop on the GPU. This is not a native CUDA pixel-parity claim.</p>
+<fieldset id="controls" disabled>
+<label>Input fixture<select id="source"><option value="0">Author illustrated example</option><option value="1">Shared grayscale photo</option></select></label>
+<label>Starting pose<select id="preset"><option>front</option><option>arms</option><option>elbow</option><option>hand</option><option>jaw</option><option>side</option><option>back</option></select></label>
+<label>Body yaw <output id="yaw-value">0.00</output><input id="yaw" type="range" min="-1.8" max="1.8" step="0.02" value="0"></label>
+<label>Shoulder spread <output id="arms-value">0.00</output><input id="arms" type="range" min="-0.6" max="0.6" step="0.02" value="0"></label>
+<label>Jaw <output id="jaw-value">0.00</output><input id="jaw" type="range" min="0" max="0.5" step="0.01" value="0"></label>
+<label>Finger curl <output id="grip-value">0.00</output><input id="grip" type="range" min="0" max="0.7" step="0.01" value="0"></label>
+<button id="play" class="primary">Play signal-driven motion</button><button id="reset">Reset controls</button></fieldset>
+<p id="status">Loading and verifying local assets…</p><p id="error"></p>
+<p class="small">This slice tests procedural signals. Mixamo and remote/record-replay need their own IDOL mapping and validation before promotion. Existing LHM/LHM++ functionality is unchanged. <a href="?renderer=resident">GPU-resident renderer</a> · <a href="?renderer=bridge">WebGL bridge comparison</a></p>
+</aside><section id="viewport"><canvas id="avatar" width="640" height="896" aria-label="Live Gaussian avatar"></canvas></section></main>
+<script type="module" src="/deformation_demo.mjs"></script></body></html>

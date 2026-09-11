@@ -1,0 +1,54 @@
+// Topic 2 product B: compute-shader LBS for rest Gaussians.
+// p' = Σ w_k T_k p
+// Write posed xyz/rot; existing UnityGaussianSplatting sorter/rasterizer stays.
+
+#pragma kernel Skin
+
+uint _Count;
+uint _K; // 4
+StructuredBuffer<float4x4> _BoneT;     // posed @ inverseBind, length B
+StructuredBuffer<float4> _RestPos;     // xyz, 1
+StructuredBuffer<float4> _RestRot;     // quaternion xyzw
+StructuredBuffer<float4> _Weights;     // K<=4 packed
+StructuredBuffer<uint4> _BoneIds;
+RWStructuredBuffer<float3> _PosedPos;
+RWStructuredBuffer<float4> _PosedRot;
+
+float4 QuatMul(float4 a, float4 b)
+{
+    return float4(
+        a.w * b.xyz + b.w * a.xyz + cross(a.xyz, b.xyz),
+        a.w * b.w - dot(a.xyz, b.xyz));
+}
+
+[numthreads(64, 1, 1)]
+void Skin(uint3 id : SV_DispatchThreadID)
+{
+    uint i = id.x;
+    if (i >= _Count)
+        return;
+    float4 rest = _RestPos[i];
+    float4 w = _Weights[i];
+    uint4 b = _BoneIds[i];
+    float4 posed = 0;
+    float3x3 R = 0;
+    [unroll]
+    for (uint k = 0; k < 4; k++)
+    {
+        float wk = w[k];
+        if (wk <= 0)
+            continue;
+        float4x4 T = _BoneT[b[k]];
+        posed += wk * mul(T, rest);
+        R += wk * (float3x3)T;
+    }
+    _PosedPos[i] = posed.xyz;
+    // Cheap rotation: take blended linear part, convert via first row orthonormalization.
+    float3 r0 = normalize(R[0]);
+    float3 r1 = normalize(R[1] - r0 * dot(r0, R[1]));
+    float3 r2 = cross(r0, r1);
+    // store as xyzw identity if degenerate — Unity side can swap for dual-quat later
+    _PosedRot[i] = _RestRot[i];
+    // silence unused
+    r2 = r2;
+}

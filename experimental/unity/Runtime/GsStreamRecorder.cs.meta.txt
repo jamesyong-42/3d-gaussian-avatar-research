@@ -1,0 +1,2 @@
+GsStreamRecorder.cs requires com.unity.netcode.gameobjects.
+Leave it out of the Unity 6 2B throwaway until Topic 4.

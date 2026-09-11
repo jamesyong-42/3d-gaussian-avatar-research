@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Gaussian Avatar Lab: research decisions, our system design, and the generation, control and animation, and network transport pipelines. Evidence and open questions are distinguished throughout.">
+<meta name="color-scheme" content="light">
+<title>Gaussian Avatar Architecture — Research, Design &amp; Three Pipelines</title>
+<style>
+    :root{--paper:#f7f6f0;--white:#fffefa;--ink:#203b34;--muted:#62726a;--line:#d8dfd3;--green:#22654e;--mint:#e6eee2;--lime:#dbe9ab;--blue:#3559ad;--bluewash:#edf1fa;--amber:#986027;--amberwash:#fbf0df;--dark:#193b32;--mono:Consolas,'SFMono-Regular',monospace;--sans:'Segoe UI',Arial,sans-serif;--serif:Georgia,'Times New Roman',serif}
+    *{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:88px}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.72 var(--sans);-webkit-font-smoothing:antialiased}a{color:var(--green);text-decoration-thickness:1px;text-underline-offset:4px}a:hover{color:var(--blue)}button{font:inherit;cursor:pointer}button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid var(--blue);outline-offset:5px}::selection{background:var(--lime)}.skip{position:fixed;left:20px;top:-100px;background:var(--white);padding:10px;z-index:100}.skip:focus{top:10px}
+    .topbar{position:sticky;top:0;z-index:20;height:66px;padding:0 34px;background:rgba(247,246,240,.97);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:16px}.brand{display:flex;gap:13px;align-items:center;font-size:13px;letter-spacing:.03em;font-weight:700;text-decoration:none}.brand svg{width:31px;height:31px}.top-right{display:flex;align-items:center;gap:20px;font-size:11px;color:var(--muted)}.print-button{background:none;border:1px solid var(--line);border-radius:100px;padding:7px 14px;font-size:12px;color:var(--ink)}.progress-track{position:absolute;left:0;bottom:-1px;width:100%;height:2px}.progress-track div{height:100%;width:0;background:var(--green)}
+    .layout{display:grid;grid-template-columns:238px minmax(0,1080px);gap:58px;max-width:1480px;margin:auto;padding:0 48px 0 30px}.sidebar{position:sticky;top:94px;height:calc(100vh - 110px);overflow:auto;padding:18px 0 28px}.nav-label,.eyebrow,.chapter-kicker{font:700 10px/1.5 var(--sans);letter-spacing:.19em;text-transform:uppercase}.nav-label{margin:0 0 17px 12px;color:var(--muted)}.sidebar nav{display:grid;gap:3px}.sidebar nav a{display:flex;gap:11px;align-items:baseline;padding:7px 12px;text-decoration:none;color:var(--muted);font-size:12px;border-left:2px solid transparent;border-radius:0 4px 4px 0}.sidebar nav a span{font:10px var(--mono);opacity:.75}.sidebar nav a.active{color:var(--green);background:var(--mint);border-color:var(--green);font-weight:600}.nav-foot{font-size:11px;color:var(--muted);margin:30px 12px;border-top:1px solid var(--line);padding-top:18px}.nav-foot strong{color:var(--ink)}.nav-foot a{display:inline-block;margin-top:8px}.mobile-nav{display:none}
+    main{min-width:0}.hero{padding:65px 0 58px}.eyebrow{color:var(--green);display:flex;gap:10px;align-items:center}.eyebrow:before{content:'';width:26px;height:1px;background:var(--green)}h1{font:400 clamp(43px,4.5vw,68px)/1.09 var(--serif);letter-spacing:-.045em;margin:25px 0 24px;max-width:880px}h1 em{font-weight:400;color:var(--green)}.lede{font-size:18px;line-height:1.75;max-width:760px;color:var(--muted)}.hero-meta{display:flex;gap:12px;flex-wrap:wrap;margin:27px 0 33px}.pill{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);padding:4px 10px;border-radius:100px;font-size:10px;font-weight:700;letter-spacing:.04em}.pill:before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor}.pill.done{background:var(--mint);color:var(--green)}.pill.research{background:var(--bluewash);color:var(--blue)}.pill.future{background:var(--amberwash);color:var(--amber)}.hero-rule{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--white)}.hero-stat{padding:22px 24px;border-right:1px solid var(--line)}.hero-stat:last-child{border:0}.hero-stat strong{display:block;font:400 34px/1.2 var(--serif);letter-spacing:-.025em}.hero-stat span{font-size:10px;display:block;margin-top:7px;color:var(--muted);letter-spacing:.09em;text-transform:uppercase}.hero-stat small{display:block;font-size:10px;margin-top:4px;color:var(--muted)}
+    section.chapter{border-top:1px solid var(--line);padding:51px 0 54px;scroll-margin-top:86px}.chapter-kicker{color:var(--green);margin:0 0 15px;display:flex;gap:11px;align-items:center}.chapter-kicker span{display:inline-grid;place-items:center;width:27px;height:27px;border:1px solid var(--line);border-radius:50%;font:11px var(--mono);letter-spacing:0}h2{font:400 37px/1.18 var(--serif);letter-spacing:-.027em;margin:0 0 22px}h3{font-size:18px;line-height:1.4;margin:30px 0 12px;letter-spacing:-.015em}h4{font-size:14px;margin:0 0 9px}p{margin:0 0 17px}strong{font-weight:650}.section-intro{font-size:18px;line-height:1.65;color:var(--muted);max-width:800px;margin-bottom:28px}.small{font-size:12px;color:var(--muted)}.source-line{font-size:11px;color:var(--muted);margin:18px 0 0}.source-line a{margin-right:8px}.cols{display:grid;grid-template-columns:1fr 1fr;gap:20px}.three{grid-template-columns:repeat(3,minmax(0,1fr))}.card{padding:23px;background:var(--white);border:1px solid var(--line);border-radius:9px}.card p{font-size:14px;margin-bottom:0}.card .tag{display:block;font:10px var(--mono);letter-spacing:.07em;color:var(--muted);margin-bottom:13px}.card.chosen{border-color:#8fac92;background:#eef3e7}.card.dark{background:var(--dark);color:#f6f8f0;border-color:var(--dark)}.card.dark .tag,.card.dark p{color:#c5d5c9}.card.dark a{color:var(--lime)}.callout{padding:18px 22px;border-left:3px solid var(--green);background:var(--mint);border-radius:0 7px 7px 0;margin:24px 0;font-size:14px}.callout p:last-child{margin:0}.callout.warn{background:var(--amberwash);border-color:var(--amber)}.callout.info{background:var(--bluewash);border-color:var(--blue)}.callout .mini{font-size:10px;letter-spacing:.13em;font-weight:700;text-transform:uppercase;display:block;margin-bottom:7px}
+    figure{margin:29px 0}.diagram{padding:28px;background:var(--white);border:1px solid var(--line);border-radius:10px;overflow:hidden}.diagram.dark{background:var(--dark);border-color:var(--dark);color:var(--white)}.figure-top{display:flex;justify-content:space-between;gap:14px;margin-bottom:22px;font:10px var(--mono);color:var(--muted);letter-spacing:.06em}.dark .figure-top{color:#b8c9be}figcaption{font-size:12px;line-height:1.6;color:var(--muted);margin-top:12px}.diagram svg{display:block;width:100%;height:auto}.diagram svg text{font-family:var(--sans)}.diagram svg .label{font-size:16px;font-weight:600;fill:var(--ink)}.diagram svg .sub{font-size:12px;fill:var(--muted)}.diagram svg .tiny{font-size:10px;fill:var(--muted)}.diagram svg .box{fill:#f2f5ec;stroke:#bdcdbb}.diagram svg .bluebox{fill:#edf1fa;stroke:#b7c7e6}.diagram svg .edge{stroke:#7b9586;stroke-width:1.5;fill:none;marker-end:url(#arrow)}.diagram svg .dashed{stroke-dasharray:5 5}.diagram svg .amberbox{fill:#fbf0df;stroke:#d5bb96}.legend{display:flex;gap:22px;flex-wrap:wrap;margin-top:18px;font-size:11px;color:var(--muted)}.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;background:var(--green)}.legend .blue{background:var(--blue)}.legend .amber{background:var(--amber)}
+    .pipeline{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:24px}.stage{position:relative;border:1px solid #466456;border-radius:7px;padding:17px 13px;min-height:127px;background:#23473b}.stage:not(:last-child):after{content:'→';position:absolute;right:-20px;top:47px;color:#c8d6b9}.stage b{font-size:13px;line-height:1.5;display:block;color:#f7f9ef}.stage small{font-size:11px;line-height:1.6;display:block;color:#c7d7cd;margin-top:7px}.stage .n{font:10px var(--mono);color:var(--lime);display:block;margin-bottom:11px}.pipeline-footer{display:grid;grid-template-columns:2fr 3fr;gap:30px;margin-top:15px;font-size:10px;letter-spacing:.1em;color:#c7d7cd}.pipeline-footer span{border-top:1px solid #56715f;padding-top:12px}.pipeline-footer span:last-child{color:var(--lime)}
+    .table-wrap{overflow-x:auto;margin:23px 0;border:1px solid var(--line);border-radius:8px;background:var(--white)}table{width:100%;border-collapse:collapse;font-size:13px;line-height:1.65}th{text-align:left;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);background:#eef1e8;padding:13px 16px;border-bottom:1px solid var(--line)}td{vertical-align:top;padding:14px 16px;border-bottom:1px solid #e6e9e0}tr:last-child td{border:0}td:first-child{font-weight:600}td p:last-child{margin:0}tr.highlight td{background:#edf3e6}.nowrap{white-space:nowrap}.table-note{font-size:12px;color:var(--muted);margin-top:-10px}.table-wrap .pill{white-space:nowrap;font-size:9px;padding:2px 7px}
+    code{font:12px/1.6 var(--mono);background:#ecefe6;border-radius:4px;padding:2px 5px;overflow-wrap:anywhere}pre{background:#1c302a;border-radius:9px;color:#dbe8d9;padding:22px 24px;overflow:auto;font:12px/1.85 var(--mono);margin:23px 0;tab-size:2}pre code{background:none;color:inherit;padding:0;overflow-wrap:normal}.comment{color:#9bb3a3}.equation{margin:22px 0;padding:20px 24px;background:var(--white);border:1px solid var(--line);border-radius:7px;overflow:auto;font:15px/2 var(--mono);white-space:nowrap}.equation small{font:12px var(--sans);display:block;color:var(--muted);white-space:normal;margin-top:8px}.steps{counter-reset:steps;padding:0;list-style:none;margin:24px 0}.steps li{counter-increment:steps;position:relative;padding:0 0 24px 46px;font-size:14px}.steps li:last-child{padding-bottom:0}.steps li:before{content:counter(steps,decimal-leading-zero);position:absolute;left:0;top:1px;width:27px;height:27px;display:grid;place-items:center;border-radius:50%;background:var(--mint);color:var(--green);font:10px var(--mono)}.steps li strong{display:block;font-size:15px;margin-bottom:5px}.steps li:after{content:'';position:absolute;left:13px;top:34px;bottom:6px;width:1px;background:var(--line)}.steps li:last-child:after{display:none}ul.bullets{padding-left:19px;font-size:14px}ul.bullets li{padding-left:4px;margin:9px 0}details{margin:18px 0;padding:17px 20px;border:1px solid var(--line);border-radius:8px;background:var(--white)}summary{cursor:pointer;font-size:13px;font-weight:650}details[open] summary{margin-bottom:18px}details p{font-size:13px}details .table-wrap{margin-bottom:0}details pre:last-child{margin-bottom:0}
+    .bandwidth{display:grid;gap:18px;margin:25px 0}.band-row{display:grid;grid-template-columns:160px 1fr 95px;align-items:center;gap:17px;font-size:12px}.bar{height:22px;background:#e6ece1;border-radius:4px;overflow:hidden}.bar b{display:block;height:100%;background:var(--green);border-radius:4px;min-width:3px}.bar.blue b{background:var(--blue)}.band-row strong{font:12px var(--mono);text-align:right}.screenshot{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#e8ede1}.screenshot img{width:100%;display:block}.evidence-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px;margin:25px 0}.evidence{border-top:2px solid var(--green);background:var(--white);padding:20px}.evidence strong{font:32px/1.2 var(--serif);display:block}.evidence span{font-size:12px;display:block;margin-top:7px}.evidence small{font-size:10px;color:var(--muted);display:block;margin-top:7px}.memory-bar{height:33px;display:flex;border-radius:5px;overflow:hidden;margin:20px 0 12px}.memory-bar span:nth-child(1){background:var(--green);width:78.79%}.memory-bar span:nth-child(2){background:#729880;width:12.87%}.memory-bar span:nth-child(3){background:var(--lime);width:8.34%}.source-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 26px}.ref{padding:18px 0;border-bottom:1px solid var(--line);font-size:12px;scroll-margin-top:90px}.ref b{font:10px var(--mono);color:var(--muted);display:block;margin-bottom:5px}.ref a{font-weight:600}.ref p{font-size:11px;color:var(--muted);margin:7px 0 0}.footer{border-top:1px solid var(--line);padding:26px 0 50px;display:flex;justify-content:space-between;gap:25px;font-size:11px;color:var(--muted)}.footer a{white-space:nowrap}.source-tag{font-size:10px;white-space:nowrap;margin-left:4px}.timeline{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:15px;margin:26px 0}.timeline article{border-top:2px solid var(--line);padding:15px 12px 12px 0}.timeline article:first-child{border-color:var(--green)}.timeline small{font:10px var(--mono);color:var(--green)}.timeline h4{margin:10px 0}.timeline p{font-size:12px;color:var(--muted)}.glossary{display:grid;grid-template-columns:145px 1fr;gap:10px 20px;font-size:13px}.glossary dt{font-weight:650}.glossary dd{margin:0;color:var(--muted)}.print-only{display:none}
+    @media(min-width:1500px){.layout{gap:75px}.hero{padding-top:82px}}
+    @media(max-width:1150px){.layout{grid-template-columns:190px minmax(0,1fr);gap:30px;padding:0 28px 0 20px}.sidebar nav a{font-size:11px}.hero-stat{padding:18px 15px}.pipeline{gap:17px}.stage:not(:last-child):after{right:-15px}.stage{padding:14px 10px}.three{grid-template-columns:1fr}.three .card p{max-width:650px}}
+    @media(max-width:850px){.layout{display:block;padding:0 25px}.sidebar{display:none}.topbar{padding:0 22px}.top-right .date{display:none}.mobile-nav{display:block;border-bottom:1px solid var(--line);margin:0;padding:12px 24px;border-radius:0;background:var(--paper)}.mobile-nav summary{font-size:12px}.mobile-nav nav{display:flex;flex-wrap:wrap;gap:8px 19px;padding:8px 0}.mobile-nav a{font-size:12px}.hero{padding-top:45px}h1{font-size:56px}.three{grid-template-columns:repeat(3,minmax(0,1fr))}.hero-rule{margin-top:30px}.diagram{padding:22px}.pipeline{gap:21px}.stage:not(:last-child):after{right:-18px}.hero-stat strong{font-size:29px}.timeline{grid-template-columns:1fr 1fr}}
+    @media(max-width:560px){body{font-size:15px}.layout{padding:0 19px}.topbar{height:59px;padding:0 17px}.brand{font-size:11px}.top-right{gap:8px}.print-button{font-size:10px;padding:6px 10px}.hero{padding:35px 0}.hero h1{font-size:43px}.lede,.section-intro{font-size:16px}.hero-rule{grid-template-columns:1fr 1fr}.hero-stat:nth-child(2){border-right:0}.hero-stat:nth-child(-n+2){border-bottom:1px solid var(--line)}section.chapter{padding:37px 0}h2{font-size:31px}.cols,.three,.source-grid{grid-template-columns:1fr}.diagram{padding:17px 13px}.figure-top{font-size:9px;gap:8px}.pipeline{grid-template-columns:1fr;gap:17px}.stage{min-height:0;padding:13px 15px}.stage .n{float:left;margin:5px 13px 0 0}.stage b{font-size:13px}.stage small{margin:3px 0 0 28px}.stage:not(:last-child):after{content:'↓';right:50%;top:auto;bottom:-21px}.pipeline-footer{grid-template-columns:1fr;gap:7px}.diagram svg{min-width:630px}.diagram.svg-wrap{overflow-x:auto}.hero-stat small{font-size:9px}th,td{padding:11px 12px;min-width:130px}.evidence-grid{grid-template-columns:1fr}.evidence strong{font-size:30px}.band-row{grid-template-columns:110px 1fr 75px;gap:8px;font-size:10px}.glossary{grid-template-columns:1fr;gap:3px}.glossary dd{margin-bottom:12px}.footer{flex-direction:column}.source-line{overflow-wrap:anywhere}.card{padding:20px}.equation{font-size:12px;padding:16px}.diagram.dark .pipeline{margin:0 3px}}
+    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+    @media print{@page{size:A4;margin:16mm 14mm}body{font-size:10pt;background:white;line-height:1.55;color:#172b24}.topbar,.sidebar,.mobile-nav,.skip,.print-button{display:none!important}.layout{display:block;max-width:none;padding:0}.hero{padding:10px 0 28px}h1{font-size:36pt}.lede,.section-intro{font-size:12pt}h2{font-size:23pt}h3{font-size:13pt}.chapter{break-before:page;padding:0!important;border:0!important}.hero-rule,.card,.callout,.diagram,.evidence,th,.memory-bar,.bar{-webkit-print-color-adjust:exact;print-color-adjust:exact}.diagram,.card,.callout,.evidence,pre,.equation,.ref{break-inside:avoid}.cols{gap:12px}.three{grid-template-columns:repeat(3,1fr)}.hero-stat{padding:14px}.hero-stat strong{font-size:24pt}table{font-size:9pt}th{font-size:8pt}td,th{padding:8px 10px}thead{display:table-header-group}tr{break-inside:avoid}.table-wrap{overflow:visible}a{color:inherit;text-decoration:underline}pre{font-size:8pt;white-space:pre-wrap}.diagram svg{min-width:0}.diagram{padding:15px}.screenshot{max-width:145mm;margin:auto}.source-grid{grid-template-columns:1fr 1fr}.print-only{display:block}.footer{padding-bottom:0}.pill{font-size:8px}details{break-inside:auto}.diagram.dark{background:#e8eee2;color:#172b24}.dark .figure-top{color:#31483a}.stage{background:#f8faf3;border-color:#889c88}.stage b{color:#183b2b}.stage small,.stage .n,.stage:not(:last-child):after,.pipeline-footer span,.pipeline-footer span:last-child{color:#314a38}}
+    /* Keep embedded evidence proportional and avoid orphaned print pages. */
+    .screenshot img{height:auto}
+    .chapter>p{max-width:900px}
+    @media print{
+      .hero{break-after:page}
+      section.chapter{break-before:auto;padding:24px 0 20px!important;border-top:1px solid #d8dfd3!important}
+      .chapter-kicker,h2,h3,h4{break-after:avoid}
+      h2{margin-bottom:14px}h3{margin-top:21px}p{margin-bottom:11px}
+      .section-intro{margin-bottom:19px}.chapter-kicker{margin-bottom:10px}
+      figure{margin:18px 0;break-inside:avoid}.cols,.timeline,.evidence-grid{break-inside:avoid}
+      .card{padding:15px}.card p{font-size:9.5pt}.callout{padding:12px 16px;margin:16px 0;font-size:9.5pt}
+      .table-wrap{margin:16px 0}.source-line{margin-top:11px;font-size:8pt}
+      .screenshot{width:145mm;max-width:100%;break-inside:avoid}.screenshot img{height:auto;max-height:165mm;object-fit:contain}
+      .steps{margin:16px 0}.steps li{padding-bottom:17px;font-size:9.5pt}
+      details{padding:13px 16px;margin:14px 0}.footer{break-inside:avoid}
+    }
+
+    /* Edition 02: research decisions first, then three implementation pillars. */
+    section.chapter{scroll-margin-top:0}
+    .nav-group{margin:15px 12px 6px;font-size:9px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted)}
+    .sidebar nav a.pillar-link{font-weight:650;color:var(--ink)}
+    .read-route{display:flex;flex-wrap:wrap;gap:8px 15px;margin-top:24px;font-size:12px;color:var(--muted)}
+    .read-route a{text-decoration:none;border-bottom:1px solid var(--line)}
+    .paper-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+    .paper-card{padding:23px;background:var(--white);border:1px solid var(--line);border-top:3px solid var(--blue);border-radius:8px;scroll-margin-top:88px;min-width:0}
+    .paper-card.adopted{border-top-color:var(--green)}.paper-card.watch{border-top-color:var(--amber)}
+    .paper-card .paper-top{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+    .paper-card .paper-index{font:10px var(--mono);color:var(--muted)}
+    .paper-card h4{font:400 24px/1.2 var(--serif);margin:15px 0 7px}
+    .paper-card .paper-subtitle{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:17px}
+    .paper-card dl{display:grid;grid-template-columns:62px minmax(0,1fr);gap:10px 13px;margin:0;font-size:12px;line-height:1.65}
+    .paper-card dt{font-size:9px;letter-spacing:.07em;text-transform:uppercase;font-weight:700;color:var(--blue);padding-top:3px}
+    .paper-card dd{margin:0}
+    .paper-card .decision{margin:18px 0 0;padding:13px 15px;background:var(--mint);font-size:12px;border-radius:5px}
+    .paper-card.watch .decision{background:var(--amberwash)}
+    .paper-card .decision b{font-size:9px;letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:5px}
+    .paper-card .source-line{margin-top:14px}.paper-grid.systems .paper-card{border-top-color:var(--green)}
+    .chapter-jump{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 27px}
+    .chapter-jump a{padding:5px 10px;border:1px solid var(--line);border-radius:30px;text-decoration:none;font-size:11px}
+    .pillar-heading{border-top:3px solid var(--green)!important}.pillar-heading .chapter-kicker{color:var(--green)}
+    .subsection{scroll-margin-top:90px;margin-top:36px}
+    .provenance-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+    .provenance-row article{border-radius:8px;padding:22px;background:var(--bluewash);border:1px solid #c8d3e8}
+    .provenance-row article:nth-child(2){background:var(--mint);border-color:#bfd0bc}
+    .provenance-row article:nth-child(3){background:var(--amberwash);border-color:#ddc8a8}
+    .provenance-row h3{margin:8px 0 12px;font-size:17px}
+    .provenance-row p{font-size:13px;margin:0}
+    .provenance-row small{font:9px var(--mono);letter-spacing:.08em}
+    .decision-table td:first-child{width:22%}.decision-table td{font-size:12px}
+    .figure-summary{font-size:13px!important;color:var(--muted);margin:12px 0 0}
+    .budget-bars{display:grid;gap:14px;margin:23px 0}
+    .budget-row{display:grid;grid-template-columns:145px 1fr 92px;align-items:center;gap:14px;font-size:12px}
+    .budget-track{height:27px;background:#edf0e8;border-radius:5px;overflow:hidden}
+    .budget-track span{display:block;height:100%;border-radius:5px;background:var(--green)}
+    .budget-row:first-child .budget-track span{background:#8ba39b}
+    .budget-row:last-child .budget-track span{background:var(--blue)}
+    .budget-row b{font:12px var(--mono);text-align:right}
+    .contract-ribbon{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:22px 0}
+    .contract-ribbon div{border-top:2px solid var(--green);padding-top:14px;font-size:13px}
+    .contract-ribbon b{display:block;margin-bottom:6px}.contract-ribbon span{color:var(--muted)}
+    .paper-inventory{font-size:12px}.paper-inventory td:first-child{min-width:135px}
+    .packet{display:flex;min-width:620px;border-radius:7px;overflow:hidden;margin:22px 0 12px}
+    .packet div{padding:16px 12px;background:var(--mint);border-right:2px solid var(--white);font-size:11px;flex:1}
+    .packet div:nth-child(3){background:var(--green);color:var(--white);flex:3}
+    .packet div:last-child{background:var(--bluewash);border:0;flex:1.7}
+    .packet b{display:block;font:18px var(--mono);margin-bottom:7px}
+    .packet-wrap{overflow:auto}
+    .reading-note{font-size:12px;color:var(--muted);padding:16px 0;border-bottom:1px solid var(--line)}
+    .source-grid .ref{min-width:0}.source-grid .ref a{overflow-wrap:anywhere}
+    .section-number{font:11px var(--mono);color:var(--green);margin-right:8px}
+    .paper-group{scroll-margin-top:90px}
+    .cols>.card,.provenance-row article{min-width:0}
+    @media(max-width:1150px){.provenance-row{grid-template-columns:1fr}.paper-card{padding:20px}}
+    @media(max-width:560px){.paper-grid,.contract-ribbon{grid-template-columns:1fr}.paper-card{padding:19px}.paper-card dl{grid-template-columns:51px 1fr;gap:9px 11px}.paper-card h4{font-size:24px}.budget-row{grid-template-columns:83px 1fr 70px;gap:9px;font-size:10px}.budget-row b{font-size:10px}.chapter-jump{gap:7px}.read-route{font-size:11px}.packet div{padding:12px 9px}.figure-top{flex-wrap:wrap}}
+    @media print{.paper-card{break-inside:avoid;padding:16px;-webkit-print-color-adjust:exact;print-color-adjust:exact}.paper-card h4{font-size:18pt}.paper-card dl,.paper-card .decision{font-size:9pt}.paper-card .source-line{font-size:8pt}.paper-grid{gap:13px}.paper-grid,.provenance-row{break-inside:auto}.provenance-row{grid-template-columns:1fr 1fr 1fr}.provenance-row article{padding:14px;break-inside:avoid}.chapter-jump,.read-route{display:none}.budget-track,.packet div,.decision,.provenance-row article{-webkit-print-color-adjust:exact;print-color-adjust:exact}.packet{min-width:0}.packet-wrap{overflow:visible}.contract-ribbon{break-inside:avoid}.subsection{margin-top:25px}.paper-inventory{font-size:9pt}.paper-inventory td:first-child{min-width:0}.nav-group{display:none}}
+</style>
+</head>
+
+<body id="top">
+<a class="skip" href="#main">Skip to document</a>
+<header class="topbar">
+  <a class="brand" href="#top"><svg viewBox="0 0 32 32" aria-hidden="true"><ellipse cx="16" cy="16" rx="13" ry="6" fill="none" stroke="#22654e"/><ellipse cx="16" cy="16" rx="13" ry="6" fill="none" stroke="#22654e" transform="rotate(60 16 16)"/><ellipse cx="16" cy="16" rx="13" ry="6" fill="none" stroke="#22654e" transform="rotate(120 16 16)"/><circle cx="16" cy="16" r="3" fill="#22654e"/></svg>GAUSSIAN AVATAR LAB</a>
+  <div class="top-right"><span class="date">Architecture · Edition 02 · 11 September 2026</span><button class="print-button" id="print-document" type="button">Print / Save PDF</button></div>
+  <div class="progress-track" aria-hidden="true"><div id="reading-progress"></div></div>
+</header>
+<details class="mobile-nav"><summary>Explore this document</summary><nav id="mobile-toc" aria-label="Mobile contents"></nav></details>
+<div class="layout">
+<aside class="sidebar" aria-label="Document navigation">
+  <p class="nav-label">From research to a working system</p>
+  <nav id="toc" aria-label="Contents">
+    <a href="#goals"><span>01</span>What we want to achieve</a>
+    <a href="#landscape"><span>02</span>Research landscape</a>
+    <a href="#papers"><span>03</span>Paper-by-paper lessons</a>
+    <a href="#design"><span>04</span>Our design &amp; contribution</a>
+    <div class="nav-group">The three pillars</div>
+    <a class="pillar-link" href="#generation"><span>05</span>Generation pipeline</a>
+    <a class="pillar-link" href="#control"><span>06</span>Control &amp; animation</a>
+    <a class="pillar-link" href="#network"><span>07</span>Network transport</a>
+    <div class="nav-group">Evidence &amp; next decisions</div>
+    <a href="#proof"><span>08</span>What is actually proven</a>
+    <a href="#unity"><span>09</span>Roadmap to Unity / Meta</a>
+    <a href="#operations"><span>10</span>Operations &amp; boundaries</a>
+    <a href="#references"><span>11</span>Sources &amp; glossary</a>
+  </nav>
+  <div class="nav-foot"><strong>A research prototype, not a new foundation model.</strong><br>Implementation evidence through September 10. Paper descriptions and local results are labeled separately.<br><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/CONTRACTS.md">Portable contracts ↗</a><br><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/evidence.md">Verification log ↗</a></div>
+</aside>
+<main id="main">
+<header class="hero">
+  <div class="eyebrow">Research → design → three pipeline pillars</div>
+  <h1>From photographs<br>to a <em>shared presence.</em></h1>
+  <p class="lede">A technical account of how we turn personal photos into a controllable Gaussian avatar, animate it locally, and transmit a performance—first in the browser, with a testable path toward Unity and Meta devices.</p>
+  <div class="hero-meta"><span class="pill done">LHM + LHM++ integrated</span><span class="pill research">IDOL in isolated lab</span><span class="pill future">Unity / Quest not yet proven</span></div>
+  <div class="hero-rule">
+    <div class="hero-stat"><strong>1–8</strong><span>Input photographs</span><small>One for LHM; up to eight for LHM++</small></div>
+    <div class="hero-stat"><strong>3</strong><span>Architecture pillars</span><small>Generation · animation · transport</small></div>
+    <div class="hero-stat"><strong>55</strong><span>Articulated joints</span><small>Inherited SMPL-X rig in the main app</small></div>
+    <div class="hero-stat"><strong>386 B</strong><span>Normal pose packet</span><small>GSW2, with zero active expressions</small></div>
+  </div>
+  <div class="callout"><span class="mini">Public repository · September 11, 2026</span><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/README.md">Clone and run the synthetic demo</a> or <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/generation.md">configure photo generation</a>. No model weights, body-model templates, participant images or generated avatars are bundled. The native integrations described here require their own setup and rights review.</div>
+  <div class="read-route"><span>Reading routes:</span><a href="#papers">Understand the research</a><a href="#design">See what we designed</a><a href="#generation">Follow the implementation</a><a href="#proof">Check the evidence</a></div>
+</header>
+
+<section class="chapter" id="goals">
+  <p class="chapter-kicker"><span>01</span>The objective</p>
+  <h2>What we want to achieve</h2>
+  <p class="section-intro">Create a recognizable, full-body digital person from ordinary photos—and make that person behave like an interactive avatar, not a prerecorded reconstruction.</p>
+  <div class="cols three">
+    <article class="card"><span class="tag">CREATE</span><h3 style="margin-top:0">Low-friction identity</h3><p>A user uploads photos of the same person and outfit. A reconstruction job produces a saved, reusable avatar with enough information for future poses.</p></article>
+    <article class="card"><span class="tag">PERFORM</span><h3 style="margin-top:0">One avatar, many signals</h3><p>Joint controls, motion clips, head-and-hand targets, or camera tracking drive the same avatar. Recording and replay preserve the resolved performance.</p></article>
+    <article class="card"><span class="tag">SHARE</span><h3 style="margin-top:0">Local, free-view rendering</h3><p>A receiver obtains the asset, then compact motion updates. Each viewer can choose a viewpoint and render the moving avatar locally.</p></article>
+  </div>
+  <figure class="diagram dark">
+    <div class="figure-top"><span>FIG 01 / THE USER JOURNEY</span><span>Creation is occasional · performance is continuous</span></div>
+    <div class="pipeline">
+      <div class="stage"><span class="n">01</span><b>Upload photos</b><small>Same identity<br>Model-specific input budget</small></div>
+      <div class="stage"><span class="n">02</span><b>Generate &amp; export</b><small>Pretrained model<br>Rigged portable asset</small></div>
+      <div class="stage"><span class="n">03</span><b>Resolve controls</b><small>Motion, targets, tracking<br>One complete pose</small></div>
+      <div class="stage"><span class="n">04</span><b>Animate locally</b><small>Deform Gaussians<br>Render in the browser</small></div>
+      <div class="stage"><span class="n">05</span><b>Share performance</b><small>Pose snapshots<br>Receiver-local rendering</small></div>
+    </div>
+    <div class="pipeline-footer"><span>PILLAR I · GENERATION</span><span>PILLARS II &amp; III · CONTROL + TRANSPORT</span></div>
+    <figcaption style="color:#c7d7cd">The native reconstruction process ends after export. Interactive playback does not require a continuously running Python renderer.</figcaption>
+  </figure>
+  <h3>Why prove this on the web first?</h3>
+  <p>The browser makes each boundary inspectable: the saved representation, the rig, the controls, the deformation result, and the packets. We can compare native and browser geometry, replay the same motion, and open a second receiver before adding headset calibration, stereo rendering, and engine integration.</p>
+  <div class="callout"><span class="mini">Our success criterion</span>A generated avatar must survive outside its originating model process: reload it, apply a previously unseen pose, drive it with real Mixamo motion, record it, and reproduce the performance on another browser using the same asset and pose contract.</div>
+  <p class="small">The MVP is not a claim of studio-quality identity, physically simulated clothing, semantic facial capture, production telepresence, or standalone Quest performance. Those need separate evidence and budgets.</p>
+</section>
+
+<section class="chapter" id="landscape">
+  <span id="research"></span>
+  <p class="chapter-kicker"><span>02</span>The research landscape</p>
+  <h2>“State of the art” depends on the question.</h2>
+  <p class="section-intro">Input effort, body coverage, appearance quality, and runtime requirements define different research problems. A beautiful head avatar, a relightable studio capture, and a portable full-body photo reconstruction are not interchangeable solutions.</p>
+  <div class="table-wrap">
+    <table><thead><tr><th>Research lane</th><th>Representative work</th><th>What it buys</th><th>Trade-off for our prototype</th></tr></thead><tbody>
+      <tr class="highlight"><td>Single / few-photo reconstruction</td><td>LHM, LHM++, IDOL, DiGS</td><td>A learned human prior makes fast, low-capture creation possible.</td><td>Unobserved appearance is inferred. Exportable animation must be checked, not assumed.</td></tr>
+      <tr><td>Per-person video fitting</td><td>HUGS, ExAvatar; head-focused FlashAvatar</td><td>More observations and subject-specific optimization.</td><td>More capture and fitting; a different input budget from one photo.</td></tr>
+      <tr><td>Head-specialist reconstruction</td><td>LAM, Avat3r, FastAvatar, GaussianAvatars</td><td>More representation and training capacity devoted to facial detail and expression.</td><td>Not a full-body generator; combining head and body introduces a seam and control problem.</td></tr>
+      <tr><td>Relightable codec avatars</td><td>Relightable Full-body Gaussian Codec Avatars</td><td>Pose-aware light transport and detailed appearance under new illumination.</td><td>Controlled capture and learned rendering components exceed the casual-photo MVP.</td></tr>
+      <tr><td>Interactive telepresence systems</td><td>Mon3tr, VRGaussianAvatar</td><td>Capture, control, rendering, and communication working together.</td><td>They make different choices about avatar creation and where live rendering runs.</td></tr>
+    </tbody></table>
+  </div>
+  <p class="source-line">Primary sources for each lane are linked in the <a href="#papers">paper ledger below</a>. The wider survey remains in <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/research.md">our research atlas</a>; the executable shortlist is in <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/research.md">the generation experiment plan</a>.</p>
+  <figure class="diagram svg-wrap">
+    <div class="figure-top"><span>FIG 02 / WHAT MAKES A SPLAT AN AVATAR?</span><span>Appearance primitive ≠ animation model</span></div>
+    <svg viewBox="0 0 900 265" role="img" aria-labelledby="primitive-title primitive-desc">
+      <title id="primitive-title">A Gaussian representation becomes animatable through an explicit deformation model</title>
+      <desc id="primitive-desc">Gaussian attributes define appearance. A body rig, bindings, and deformation rules move these attributes from a rest pose to a posed avatar. A rasterizer projects the posed Gaussians into an image.</desc>
+      <defs><marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0L7 3.5L0 7Z" fill="#7b9586"/></marker></defs>
+      <rect class="bluebox" x="5" y="20" width="255" height="204" rx="10"/>
+      <ellipse cx="66" cy="76" rx="31" ry="17" transform="rotate(-27 66 76)" fill="#84a89b" opacity=".55"/><ellipse cx="66" cy="76" rx="22" ry="11" transform="rotate(-27 66 76)" fill="#22654e" opacity=".7"/><circle cx="66" cy="76" r="4" fill="#203b34"/>
+      <text class="label" x="112" y="67">3D Gaussian</text><text class="sub" x="112" y="88">An oriented soft ellipsoid</text>
+      <text class="sub" x="25" y="130">Position + rotation + anisotropic scale</text><text class="sub" x="25" y="153">Color / appearance + opacity</text><text class="sub" x="25" y="189">A PLY alone does not define a rig.</text>
+      <path class="edge" d="M270 119H311"/>
+      <rect class="box" x="322" y="20" width="255" height="204" rx="10"/>
+      <text class="label" x="343" y="57">Animation model</text><text class="sub" x="343" y="88">Skeleton + rest configuration</text><text class="sub" x="343" y="111">Per-Gaussian bindings / weights</text><text class="sub" x="343" y="134">Expression / corrective behavior</text><text class="sub" x="343" y="189">New pose → new Gaussian attributes</text>
+      <path class="edge" d="M588 119H629"/>
+      <rect class="box" x="640" y="20" width="255" height="204" rx="10"/>
+      <text class="label" x="661" y="57">Local splat renderer</text><text class="sub" x="661" y="88">Project into screen-space ellipses</text><text class="sub" x="661" y="111">Depth order + alpha composition</text><text class="sub" x="661" y="134">Viewer chooses the camera</text><text class="sub" x="661" y="189">No triangle skin is required to display.</text>
+    </svg>
+    <figcaption>3DGS provides the visual representation. Human reconstruction papers add a body prior and animation behavior. Our portable runtime must preserve those behaviors explicitly.</figcaption>
+  </figure>
+  <div class="cols">
+    <article class="card"><h4>What the frontier is improving</h4><p>Stronger human priors, multiple real observations, structured UV representations, generative completion, pose-dependent corrections, expressive faces, and relighting. These target different failure modes.</p></article>
+    <article class="card"><h4>What our decision must optimize</h4><p>Recognizability and motion quality <em>at an acceptable capture, asset, and device cost</em>. We need released models, inspectable outputs, faithful deformation, and reproducible browser evidence.</p></article>
+  </div>
+  <div class="callout warn"><span class="mini">No universal winner has been established here</span>Paper benchmarks use different captures, metrics, resolutions, and hardware. Our bundled-image experiments establish engineering feasibility—not a held-out identity-quality ranking or a new state-of-the-art claim.</div>
+</section>
+
+
+<section class="chapter" id="papers">
+  <p class="chapter-kicker"><span>03</span>Reading → lessons → decisions</p>
+  <h2>What each paper contributes</h2>
+  <p class="section-intro">A decision ledger for the papers driving this architecture and the generation shortlist. “Learn” and “our decision” are our interpretation; they are not claims made by the paper’s authors.</p>
+  <p class="reading-note">Coverage: the foundational, generation, head-avatar and telepresence works used in our design discussions, plus the reviewed shortlist. The broader <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/research.md">survey atlas</a> also mentions scene-rendering and compression papers; those mentions are not presented here as implemented or experimentally evaluated avatar methods.</p>
+  <nav class="chapter-jump" aria-label="Paper groups"><a href="#paper-foundations">Foundations &amp; generators</a><a href="#paper-systems">Telepresence systems</a><a href="#paper-alternatives">Alternative methods &amp; watchlist</a></nav>
+  <div class="legend"><span><i></i>Integrated / inherited</span><span><i class="blue"></i>Lab or conceptual influence</span><span><i class="amber"></i>Conditional / future work</span></div>
+  <h3 class="paper-group" id="paper-foundations">Foundations and our executable generation path</h3>
+  <div class="paper-grid"><article class="paper-card adopted" id="paper-3dgs">
+  <div class="paper-top"><span class="paper-index">P01</span><span class="pill done">Inherited foundation</span></div>
+  <h4>3D Gaussian Splatting</h4><p class="paper-subtitle">Kerbl et al. · SIGGRAPH 2023 · representation foundation</p>
+  <dl><dt>Idea</dt><dd>Represent a scene with explicit, anisotropic Gaussian primitives instead of querying a radiance network for every sample.</dd><dt>Tech</dt><dd>Optimized centers, covariance, opacity and appearance; adaptive density control; a visibility-aware splatting rasterizer.</dd><dt>Learn</dt><dd>Explicit primitives can be stored and rendered efficiently, but static reconstruction does not supply a human rig.</dd></dl>
+  <p class="decision"><b>Our decision</b>Adopt the representation through the upstream avatar models and Spark. We did not invent Gaussian splatting or reproduce the original scene-training pipeline.</p>
+  <p class="source-line"><a href="https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/">Paper &amp; author project</a></p>
+</article>
+<article class="paper-card adopted" id="paper-smplx">
+  <div class="paper-top"><span class="paper-index">P02</span><span class="pill done">Inherited rig</span></div>
+  <h4>SMPL-X</h4><p class="paper-subtitle">Pavlakos et al. · CVPR 2019 · expressive body prior</p>
+  <dl><dt>Idea</dt><dd>Use one parameterized model for body shape, articulated hands and facial expression.</dd><dt>Tech</dt><dd>A learned body model with a skeletal hierarchy, blend shapes and skinning; SMPLify-X is the paper’s image-fitting method.</dd><dt>Learn</dt><dd>A common body vocabulary can connect reconstruction and motion, but coordinate conventions and expression dimensions still differ between implementations.</dd></dl>
+  <p class="decision"><b>Our decision</b>Inherit the model-specific rig and deformation data from LHM / LHM++. Define our portable schema around them. The skeleton, anatomical prior and skinning mathematics are not ours.</p>
+  <p class="source-line"><a href="https://smpl-x.is.tue.mpg.de/">Paper, model &amp; terms</a></p>
+</article>
+<article class="paper-card adopted" id="paper-lhm">
+  <div class="paper-top"><span class="paper-index">P03</span><span class="pill done">Main-app baseline</span></div>
+  <h4>LHM</h4><p class="paper-subtitle">Large Animatable Human Reconstruction Model · 2025</p>
+  <dl><dt>Idea</dt><dd>Infer an animatable, full-body Gaussian avatar from a single image in a feed-forward pass.</dd><dt>Tech</dt><dd>Image-feature conditioning and a human-structured transformer predict canonical Gaussian attributes; the body prior provides animation structure.</dd><dt>Learn</dt><dd>The model already supplies the reconstruction and rigging ingredients. The engineering opportunity is to extract and preserve them beyond its native renderer.</dd></dl>
+  <p class="decision"><b>Our decision</b>Use the official LHM-500M-HF checkpoint by default; expose 1B-HF and shape estimation as controlled alternatives. Our exporter and browser implementation are custom; the pretrained generator is upstream.</p>
+  <p class="source-line"><a href="https://arxiv.org/abs/2503.10625">Paper</a><a href="https://github.com/aigc3d/LHM">Official code</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/backend/export_lhm.py">Our exporter</a></p>
+</article>
+<article class="paper-card adopted" id="paper-lhmpp">
+  <div class="paper-top"><span class="paper-index">P04</span><span class="pill done">Main-app option</span></div>
+  <h4>LHM++</h4><p class="paper-subtitle">Pose-free image reconstruction · 2025 / revised March 2026</p>
+  <dl><dt>Idea</dt><dd>Use one or multiple pose-free photographs to recover a more detailed, animatable human.</dd><dt>Tech</dt><dd>Point/image feature fusion, shape prediction and a Gaussian representation; the broader paper also includes a neural animation renderer.</dd><dt>Learn</dt><dd>Additional real views can constrain hidden regions. A native neural-enhanced result is not automatically the same product as a portable Gaussian-only render.</dd></dl>
+  <p class="decision"><b>Our decision</b>Integrate LHMPP-700M-PixelShuffle, 1–8 photos and 160K splats. Export its native shape and bindings, compact the runtime asset and animate with WebGPU. We do not port the paper’s complete neural renderer.</p>
+  <p class="source-line"><a href="https://arxiv.org/abs/2506.13766v2">Paper v2</a><a href="https://github.com/aigc3d/LHM-plusplus">Official code</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/generation-lab/lhmpp/README.md">Implementation evidence</a></p>
+</article>
+<article class="paper-card " id="paper-idol">
+  <div class="paper-top"><span class="paper-index">P05</span><span class="pill research">Isolated browser lab</span></div>
+  <h4>IDOL</h4><p class="paper-subtitle">Instant Photorealistic 3D Human Creation · CVPR 2025</p>
+  <dl><dt>Idea</dt><dd>Predict a structured human representation from one photo, using an SMPL-X UV layout to organize Gaussian attributes.</dd><dt>Tech</dt><dd>A high-resolution image encoder, UV-Alignment Transformer and UV decoder produce an animatable canonical representation.</dd><dt>Learn</dt><dd>A different reconstruction prior can require a genuinely different runtime. Shared joint names do not imply identical deformation.</dd></dl>
+  <p class="decision"><b>Our decision</b>Implement a separate exporter, compact correctives, exact posed-neighbor sizes, full covariance and a GPU-resident diagnostic renderer. Native/browser geometry passes; main-app uploads, Mixamo and remote adapters remain unintegrated.</p>
+  <p class="source-line"><a href="https://yiyuzhuang.github.io/IDOL/">Paper &amp; project</a><a href="https://github.com/yiyuzhuang/IDOL">Official code</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/generation-lab/idol/README.md">Our lab</a></p>
+</article>
+<article class="paper-card watch" id="paper-digs">
+  <div class="paper-top"><span class="paper-index">P06</span><span class="pill future">Conditional challenger</span></div>
+  <h4>DiGS-Avatar</h4><p class="paper-subtitle">UV-space diffusion completion · ECCV 2026</p>
+  <dl><dt>Idea</dt><dd>Complete a 3D-consistent UV latent from a single image, instead of first synthesizing independent views.</dd><dt>Tech</dt><dd>A multi-view teacher supervises a single-view diffusion student; semantic feature refinement precedes Gaussian decoding.</dd><dt>Learn</dt><dd>A stronger completion prior may improve unseen regions, but plausible invented detail must be measured separately from recovered identity.</dd></dl>
+  <p class="decision"><b>Our decision</b>Keep in the independent-prior experiment lane. Our September 8 readiness audit did not establish a usable pretrained dependency set; no local generation or browser trial is claimed. Recheck release readiness before execution.</p>
+  <p class="source-line"><a href="https://arxiv.org/abs/2608.20759">Paper</a><a href="https://github.com/KLMAV-CUC/DiGS-Avatar">Official code</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/research.md">Readiness gate</a></p>
+</article></div>
+  <h3 class="paper-group" id="paper-systems">The two system papers: related, but not interchangeable</h3>
+  <div class="paper-grid systems"><article class="paper-card adopted" id="paper-mon3tr">
+  <div class="paper-top"><span class="paper-index">P07</span><span class="pill research">Architectural influence</span></div>
+  <h4>Mon3tr</h4><p class="paper-subtitle">Monocular 3D telepresence · January 2026</p>
+  <dl><dt>Idea</dt><dd>Amortize expensive avatar creation offline, then send a compact live performance to a receiver that animates and renders locally.</dd><dt>Tech</dt><dd>Multi-view personalized fitting; a personalized parametric mesh and learned mesh/Gaussian corrections; monocular live tracking and a compact WebRTC stream.</dd><dt>Learn</dt><dd>Separate identity from motion, and separate avatar-building input from live tracking input. “Monocular” describes live capture—not one-photo avatar creation.</dd></dl>
+  <p class="decision"><b>Our decision</b>Adopt the asset-once / motion-continuously principle. We do not reproduce its personalized fitting, corrective networks, tracking stack or mobile transport implementation. Deferral reflects scope and readiness, not a benchmark defeat.</p>
+  <p class="source-line"><a href="https://arxiv.org/html/2601.07518v1">Paper v1</a><a href="https://mon3tr3d.github.io/">Author project</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/research.md">Our comparison</a></p>
+</article>
+<article class="paper-card adopted" id="paper-vrga">
+  <div class="paper-top"><span class="paper-index">P08</span><span class="pill research">Control / VR reference</span></div>
+  <h4>VRGaussianAvatar</h4><p class="paper-subtitle">Integrating 3D Gaussian Avatars into VR · February 2026</p>
+  <dl><dt>Idea</dt><dd>Connect an image-generated Gaussian avatar to headset-driven embodiment and evaluate the integrated VR experience.</dd><dt>Tech</dt><dd>Off-the-shelf LHM-500M reconstruction; Final IK from head/hand signals; a Python backend returns stereo JPEGs to Unity. Binocular Batching shares work across both eye views.</dd><dt>Learn</dt><dd>Sparse VR inputs can be converted into body pose. Stereo consistency and perceived embodiment deserve their own evaluation.</dd></dl>
+  <p class="decision"><b>Our decision</b>Use LHM directly, not this paper’s frontend/backend as our web implementation. Our browser renders locally and transports poses rather than stereo images. Binocular Batching remains a future stereo design reference, not an adopted or empirically rejected feature.</p>
+  <p class="source-line"><a href="https://arxiv.org/pdf/2602.01674">Paper &amp; implementation appendix</a><a href="https://github.com/hailsong/VRGaussianAvatar">Official code</a></p>
+</article></div>
+  <div class="table-wrap">
+    <table><thead><tr><th>System</th><th>Avatar creation</th><th>Live communication / rendering</th><th>Relationship to us</th></tr></thead><tbody>
+      <tr><td>Mon3tr</td><td>Personalized, offline multi-view reconstruction.</td><td>Compact motion/features; receiver-side animation and rendering.</td><td>Similar high-level split; not its learned model stack or protocol.</td></tr>
+      <tr><td>VRGaussianAvatar</td><td>Off-the-shelf single-image LHM.</td><td>Unity sends pose/cameras; Python returns stereo JPEGs in its reference system.</td><td>Control / stereo reference; different rendering location.</td></tr>
+      <tr class="highlight"><td>Our web prototype</td><td>LHM or LHM++; exported, validated rigged assets.</td><td>Asset download + GSW2 poses; browser-local deformation and rendering.</td><td>Custom portability, control adapters, runtime and verification.</td></tr>
+    </tbody></table>
+  </div>
+  <p class="small">Mon3tr’s avatar-building capture is distinct from its live monocular capture. Neither paper’s reported latency, bandwidth or headset FPS is a measurement of our prototype.</p>
+  <h3 class="paper-group" id="paper-alternatives">Alternative methods and the reviewed watchlist</h3>
+  <p>Each row preserves a specific lesson and a specific decision. <strong>Deferred does not mean inferior:</strong> some methods solve a different problem, require more capture, or had not cleared our release/export gates.</p>
+  <div class="table-wrap">
+    <table class="paper-inventory"><thead><tr><th>Paper / source</th><th>Key idea &amp; technology</th><th>What we can learn</th><th>Decision / evidence level</th></tr></thead><tbody>
+    <tr id="paper-p09"><td><span class="small">P09</span><br><a href="https://arxiv.org/abs/2606.02573">HumanNOVA</a></td><td>Image and estimated body-mesh tokens are fused into a triplane avatar representation.</td><td>Study shape conditioning and generalization. The released path we inspected does not establish an exported rigged Gaussian asset.</td><td>Appearance / geometry reference; not run as a main-app Gaussian backend.</td></tr>
+<tr id="paper-p10"><td><span class="small">P10</span><br><a href="https://arxiv.org/abs/2311.17910">HUGS</a></td><td>Fit a human and scene from monocular video, initializing human Gaussians from SMPL and optimizing their skinning weights.</td><td>Bindings are part of reconstruction, not an incidental attachment step. Extra observations and fitting can improve a subject-specific model.</td><td>Reviewed; optional video-quality lane, not a one-photo replacement.</td></tr>
+<tr id="paper-p11"><td><span class="small">P11</span><br><a href="https://mks0601.github.io/ExAvatar/">ExAvatar</a></td><td>A hybrid surface/Gaussian representation combines SMPL-X body, hand and face control with subject-specific appearance from a short phone scan.</td><td>Evaluate whether more capture effort improves expressive whole-body quality, with that input advantage reported explicitly.</td><td>Concrete optional video candidate; no local reconstruction or portable-main-app result claimed.</td></tr>
+<tr id="paper-p12"><td><span class="small">P12</span><br><a href="https://arxiv.org/abs/2502.17796">LAM</a></td><td>FLAME canonical-point queries attend to image features and predict a one-shot Gaussian head, animated with body-model-style skinning and correctives.</td><td>A head specialist can devote capacity to expression, while still targeting direct local animation.</td><td>Reviewed head-quality route; not a full-body generator or currently fused into LHM.</td></tr>
+<tr id="paper-p13"><td><span class="small">P13</span><br><a href="https://arxiv.org/abs/2502.20220">Avat3r</a></td><td>Few-image head reconstruction combines geometric and human features; expression-code cross-attention makes the reconstruction animatable.</td><td>Capture variation and inconsistent expressions matter. Learned expression-conditioned decoding may carry extra runtime requirements.</td><td>Reviewed head specialist; not implemented or selected as a full-body replacement.</td></tr>
+<tr id="paper-p14"><td><span class="small">P14</span><br><a href="https://arxiv.org/abs/2508.19754">FastAvatar</a></td><td>A large Gaussian reconstruction transformer aggregates variable-length observations using camera, expression and head-pose guidance.</td><td>More observations should improve a reconstruction incrementally; this is a useful design direction for capture UX.</td><td>Reviewed head-focused aggregation reference; not in the full-body bake-off.</td></tr>
+<tr id="paper-p15"><td><span class="small">P15</span><br><a href="https://arxiv.org/abs/2312.02069">GaussianAvatars</a></td><td>Bind Gaussians to local coordinate frames of a morphable face mesh’s triangles, and optimize offsets and model parameters.</td><td>A stable geometric attachment gives explicit expression and pose control. Its exact binding law must travel with the avatar.</td><td>Reviewed rigging precedent; its mesh-triangle head deformer is not our LHM deformer.</td></tr>
+<tr id="paper-p16"><td><span class="small">P16</span><br><a href="https://ustc3dv.github.io/FlashAvatar/">FlashAvatar</a></td><td>Embed a compact Gaussian field in a parametric face surface; learn expression-conditioned spatial offsets from monocular video.</td><td>Careful placement and a facial prior can reduce the primitive budget. Small models may still need learned correction at runtime.</td><td>Reviewed efficient head-avatar reference; no port or local performance comparison.</td></tr>
+<tr id="paper-p17"><td><span class="small">P17</span><br><a href="https://neuralbodies.github.io/RFGCA/">Relightable Full-body Gaussian Codec Avatars</a></td><td>Learn from multi-view light-stage data; combine local diffuse transport, a non-local shadow network and deferred specular shading.</td><td>Relighting is a representation-and-capture problem. Applying a scene light to baked RGB splats is not equivalent.</td><td>Quality / relighting reference; outside our casual-photo MVP.</td></tr>
+<tr id="paper-p18"><td><span class="small">P18</span><br><a href="https://research.nvidia.com/labs/dair/dream-lift-animate/">Dream, Lift, Animate</a></td><td>Synthesize plausible views, lift them into Gaussians, map into a body-aligned UV latent, and decode pose/view-dependent attributes.</td><td>Synthetic evidence must be labeled as generated. A dynamic decoder changes the asset and client runtime contracts.</td><td>Reviewed, not run; model-release and portable-decoder gates remain.</td></tr>
+<tr id="paper-p19"><td><span class="small">P19</span><br><a href="https://github.com/zj-dong/MoGA">MoGA</a></td><td>Use a learned 3D generative avatar prior to guide monocular Gaussian avatar reconstruction.</td><td>Generative-prior fitting is a different experiment from a direct feed-forward checkpoint swap.</td><td>Watchlist; our readiness review did not yield a runnable local experiment.</td></tr>
+<tr id="paper-p20"><td><span class="small">P20</span><br><a href="https://github.com/aigc3d/AniGS">AniGS</a></td><td>Combine generated views with an animatable Gaussian reconstruction method designed for inconsistent conditioning.</td><td>Generated views can disagree. More synthetic images are not automatically more reliable observations.</td><td>Watchlist; not integrated, benchmarked, or rejected on measured quality.</td></tr>
+<tr id="paper-p21"><td><span class="small">P21</span><br><a href="https://yihalem1.github.io/FlexiAvatar/">FlexiAvatar</a></td><td>Reconstruct Gaussian humans while accounting for arbitrary body visibility in video inputs.</td><td>Partial-body captures and occlusions deserve explicit coverage tests, not just a favorable full-body example.</td><td>Video-track watch item; no local run or release-readiness guarantee.</td></tr>
+    </tbody></table>
+  </div>
+  <p class="source-line">Release-readiness statements describe our recorded audit, not a promise that an upstream repository is unchanged today. See <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/research.md">the complete experiment plan</a> and <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/evidence.md">the dated readiness record</a>.</p>
+</section>
+
+<section class="chapter" id="design">
+  <span id="overview"></span>
+  <p class="chapter-kicker"><span>04</span>Our design</p>
+  <h2>Borrow the reconstruction.<br>Design the portable system around it.</h2>
+  <p class="section-intro">The durable boundary is <strong>an avatar asset plus a resolved pose</strong>. Everything before that boundary creates identity or interprets signals; everything after it reproduces the chosen model’s animation and renders the result.</p>
+  <figure class="diagram svg-wrap">
+    <div class="figure-top"><span>FIG 03 / THREE PILLARS, TWO SHARED CONTRACTS</span><span>Blue: upstream · green: our integration</span></div>
+    <svg viewBox="0 0 900 385" role="img" aria-labelledby="architecture-title architecture-desc">
+      <title id="architecture-title">The three pillars of the avatar architecture</title>
+      <desc id="architecture-desc">Generation wraps upstream models and exports a portable identity asset. Control converts inputs into a resolved pose and deforms the asset. Transport distributes the asset and pose to a receiver that uses the same deformation runtime. Asset and pose schemas connect all pillars.</desc>
+      <rect x="5" y="5" width="280" height="298" rx="10" class="box"/>
+      <rect x="310" y="5" width="280" height="298" rx="10" class="box"/>
+      <rect x="615" y="5" width="280" height="298" rx="10" class="box"/>
+      <text class="tiny" x="25" y="33">PILLAR I</text><text class="label" x="25" y="61">Generation</text>
+      <rect class="bluebox" x="25" y="83" width="240" height="65" rx="6"/><text class="label" x="40" y="109">LHM / LHM++</text><text class="sub" x="40" y="130">Pretrained reconstruction + rig</text>
+      <path class="edge" d="M144 151V173"/>
+      <text class="label" x="25" y="201">Our job + export adapter</text><text class="sub" x="25" y="224">Preserve native deformation</text><text class="sub" x="25" y="245">Compact, hash, validate, publish</text><text class="sub" x="25" y="281">Output: portable identity asset</text>
+      <text class="tiny" x="330" y="33">PILLAR II</text><text class="label" x="330" y="61">Control &amp; animation</text>
+      <text class="sub" x="330" y="100">Sliders · Mixamo · targets · camera</text><path class="edge" d="M448 114V139"/>
+      <text class="label" x="330" y="164">Our resolved-pose adapters</text><text class="sub" x="330" y="188">Root + joints + expressions + tick</text><path class="edge" d="M448 200V224"/>
+      <text class="label" x="330" y="249">Native-faithful deformation</text><text class="sub" x="330" y="281">Spark / Three.js local rendering</text>
+      <text class="tiny" x="635" y="33">PILLAR III</text><text class="label" x="635" y="61">Network transport</text>
+      <text class="label" x="635" y="102">Asset: download once</text><text class="sub" x="635" y="125">Identity / hash announced reliably</text>
+      <text class="label" x="635" y="171">Motion: GSW2 snapshots</text><text class="sub" x="635" y="194">WebSocket relay + receiver buffer</text><path class="edge" d="M753 207V229"/>
+      <text class="label" x="635" y="253">Receiver-local playback</text><text class="sub" x="635" y="281">Same asset, pose and deformer</text>
+      <rect x="5" y="325" width="890" height="54" rx="8" fill="#193b32"/>
+      <text x="27" y="348" font-size="12" fill="#e7efde">CONTRACT A · avatar.json + binary arrays</text>
+      <text x="475" y="348" font-size="12" fill="#e7efde">CONTRACT B · resolved pose / GSW2</text>
+      <text x="27" y="367" font-size="11" fill="#bcd1c2">Appearance, rig, bindings, model-specific semantics</text>
+      <text x="475" y="367" font-size="11" fill="#bcd1c2">One atomic performance snapshot, independent of input source</text>
+    </svg>
+    <figcaption>The sender resolves the motion once. Local rendering, recording and network transmission consume that same result; a receiver does not independently reinterpret the source signals.</figcaption>
+  </figure>
+  <div class="provenance-row">
+    <article><small>INHERITED</small><h3>Research and libraries</h3><p>Pretrained LHM / LHM++ generation; the SMPL-X body prior and rig; Gaussian representation and skinning mathematics; Spark / Three.js rendering; MediaPipe perception; Mixamo motion data.</p></article>
+    <article><small>DESIGNED &amp; IMPLEMENTED HERE</small><h3>Portable integration</h3><p>Model-aware exports and asset contracts; compact packaging; native-matching CPU/WebGPU deformation; signal and Mixamo adapters; resolved-pose replay; GSW2 and buffering; application, provenance and validation tooling.</p></article>
+    <article><small>STILL TO ESTABLISH</small><h3>Quality and device proof</h3><p>A consented cross-model benchmark; calibrated facial semantics; robust body/contact control; IDOL app integration; production transport; Unity/Meta parity, stereo and sustained target-device budgets.</p></article>
+  </div>
+  <h3>Where we deliberately differ</h3>
+  <div class="table-wrap"><table class="decision-table"><thead><tr><th>Decision</th><th>What we pick</th><th>Our adaptation / difference</th></tr></thead><tbody>
+    <tr><td>Photo-to-avatar</td><td>Existing pretrained models, not training a generator.</td><td>A model-specific adapter must export enough data for arbitrary later poses; a rendered image or posed PLY is insufficient.</td></tr>
+    <tr><td>Live rendering location</td><td>Mon3tr-like asset / motion separation.</td><td>Browser-local deformation and rendering; not VRGaussianAvatar’s Python stereo-image return path.</td></tr>
+    <tr><td>Control vocabulary</td><td>Rig rotations and expression parameters.</td><td>One resolved-pose contract hides whether input came from FBX, IK, camera or sliders. Device calibration remains an adapter responsibility.</td></tr>
+    <tr><td>Performance</td><td>Preserve native model behavior.</td><td>Remove numeric zeros and separate fixtures before considering approximation. Preserve every nonzero influence; validate GPU results against native references.</td></tr>
+    <tr><td>Generator flexibility</td><td>LHM++ can share validated math with LHM.</td><td>IDOL gets a distinct deformation contract. We do not force incompatible correctives, scales or face parameters into the LHM schema.</td></tr>
+    <tr><td>Research claims</td><td>Reproducibility and explicit acceptance gates.</td><td>Numerical parity, visual usability, identity quality and device performance are separate claims with separate evidence.</td></tr>
+  </tbody></table></div>
+  <div class="callout"><span class="mini">What is “ours”?</span>Our contribution is the system design and its concrete engineering: turning native research outputs into portable, controllable, shareable browser avatars. <strong>This is not evidence of a novel reconstruction algorithm, a new rigging method, or a newly trained foundation model.</strong> Scientific novelty would require its own comparison with prior art and controlled evaluation.</div>
+  <div class="contract-ribbon"><div><b>Asset = who the avatar is</b><span>Persistent appearance, shape, skeleton, bindings and deformation metadata. It changes when an avatar is regenerated.</span></div><div><b>Pose = what the avatar is doing</b><span>Small, time-varying state. It changes continuously without rerunning reconstruction.</span></div></div>
+</section>
+
+
+<section class="chapter pillar-heading" id="generation">
+  <p class="chapter-kicker"><span>05</span>Pillar I / generation pipeline</p>
+  <h2>From photographs to a portable identity</h2>
+  <p class="section-intro">Generation is an occasional GPU workload. Its output is a validated asset that the browser can animate independently—not a permanent dependency on the reconstruction process.</p>
+  <nav class="chapter-jump" aria-label="Generation topics"><a href="#reconstruction">Models &amp; execution</a><a href="#asset">Portable asset</a><a href="#compact">Compact packaging</a><a href="#generation-research">Experiment design</a></nav>
+  <h3 class="subsection" id="reconstruction">5.1 / What we run today</h3>
+  <div class="table-wrap"><table><thead><tr><th>Generator</th><th>Inputs / body shape</th><th>Output &amp; runtime</th><th>Status</th></tr></thead><tbody>
+    <tr class="highlight"><td>LHM-500M-HF</td><td>One photo. Default: ten zero shape betas; optional native shape estimation.</td><td>40,000 splats; 55 joints; 100 expression dimensions. CPU deformation remains the default for this size.</td><td><span class="pill done">Main-app default</span></td></tr>
+    <tr><td>LHM-1B-HF</td><td>One photo; the same zero / estimated shape alternatives.</td><td>40,000 splats; the same portable LHM deformation contract.</td><td><span class="pill done">Selectable control</span></td></tr>
+    <tr><td>LHMPP-700M-PixelShuffle</td><td>1–8 photos; native ShapeHead prediction.</td><td>160,000 splats; compact v2; automatic WebGPU attempt with CPU fallback.</td><td><span class="pill done">Selectable multi-photo</span></td></tr>
+    <tr><td>IDOL</td><td>Frozen native single-photo fixtures in the lab.</td><td>200,800 splats; distinct correctives, 10-expression model and full-covariance runtime.</td><td><span class="pill research">Isolated experiment</span></td></tr>
+  </tbody></table></div>
+  <p class="source-line">Actual model configuration: <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/backend/generation_config.py">generation_config.py</a> · <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/generation-lab/README.md">experiment record</a> · <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/generation-lab/idol/README.md">IDOL boundary</a>.</p>
+  <p>We use upstream code and pretrained weights with recorded revisions and hashes. We have not trained or fine-tuned the generation networks. For LHM, predicted Gaussian offsets still reconstruct geometry and appearance even with zero body-shape betas; “zero shape” does not mean the avatar is only an unmodified template. Estimated shape changes both exported geometry and rest-joint proportions, and estimator failure is reported rather than silently replaced with zero.</p>
+  <figure class="diagram svg-wrap">
+    <div class="figure-top"><span>FIG 04 / GENERATION JOB LIFECYCLE</span><span>Only a validated export becomes a ready avatar</span></div>
+    <svg viewBox="0 0 900 210" role="img" aria-labelledby="job-title job-desc">
+      <title id="job-title">Input validation, queued reconstruction, export validation and publication</title>
+      <desc id="job-desc">Normalize the ordered photos, queue a bounded GPU job, run the selected native model, export and verify the rigged asset, then publish it atomically. Failures retain diagnostic evidence without publishing a ready avatar.</desc>
+      <rect class="box" x="5" y="20" width="156" height="110" rx="8"/><text class="label" x="21" y="52">Validate inputs</text><text class="sub" x="21" y="78">Decode + normalize</text><text class="sub" x="21" y="100">Preserve view order</text>
+      <path class="edge" d="M170 75H185"/>
+      <rect class="box" x="190" y="20" width="156" height="110" rx="8"/><text class="label" x="206" y="52">Queue / GPU lock</text><text class="sub" x="206" y="78">Bound work + logs</text><text class="sub" x="206" y="100">One reconstruction</text>
+      <path class="edge" d="M354 75H370"/>
+      <rect class="bluebox" x="375" y="20" width="156" height="110" rx="8"/><text class="label" x="391" y="52">Native inference</text><text class="sub" x="391" y="78">Pinned checkpoint</text><text class="sub" x="391" y="100">Model-specific shape</text>
+      <path class="edge" d="M539 75H555"/>
+      <rect class="box" x="560" y="20" width="156" height="110" rx="8"/><text class="label" x="576" y="52">Export + verify</text><text class="sub" x="576" y="78">Bindings + fixtures</text><text class="sub" x="576" y="100">Hash + native parity</text>
+      <path class="edge" d="M724 75H739"/>
+      <rect class="box" x="744" y="20" width="151" height="110" rx="8"/><text class="label" x="760" y="52">Publish ready</text><text class="sub" x="760" y="78">Manifest + binaries</text><text class="sub" x="760" y="100">Native process exits</text>
+      <path d="M266 142V158H822" fill="none" stroke="#c5ae89" stroke-dasharray="5 5"/><text x="269" y="189" font-size="12" fill="#986027">Failure path: retain diagnostics, report the cause, do not expose a half-built avatar.</text>
+    </svg>
+    <figcaption>The LHM++ publisher stages an <code>avatar.pending.json</code> manifest until independent Node/native checks pass. A saved avatar can be viewed without running generation again.</figcaption>
+  </figure>
+  <ol class="steps">
+    <li><strong>Normalize and bound the upload.</strong>Accept JPG, PNG or WebP; decode pixels, apply EXIF orientation, convert RGB, and fit within 2048 × 2048. Enforce at least 128 pixels per side, at most 24 MP, 16 MB per file and 64 MB combined. LHM accepts one image; LHM++ accepts up to eight. Client filenames do not become filesystem paths.</li>
+    <li><strong>Execute the appropriate native adapter.</strong>LHM uses the existing workstation CUDA environment. LHM++ uses an isolated Linux CUDA container with networking disabled, read-only model/input mounts, a shared GPU lock and bounded execution. Model configuration and errors remain visible.</li>
+    <li><strong>Capture the real deformation inputs.</strong>The LHM exporter intercepts the native inference call without editing vendor source. It extracts shape-adjusted Gaussian data, the actual hierarchy, bindings and expression directions—not a separately guessed auto-rig.</li>
+    <li><strong>Generate native references and publish provenance.</strong>Export seven full center/orientation pose fixtures, byte layouts and checksums. Record model, checkpoint, source/exporter and normalized-input hashes, shape parameters and settings. Publish only when the required validation passes.</li>
+  </ol>
+  <details><summary>Operational bounds for the LHM++ generation route</summary><p>The implementation uses a 360-second container timeout, 120-second GPU-lock wait and 15 GiB configured-disk reserve. It records exact image IDs and job labels, retains failed evidence, and only stops a container whose recorded job identity matches. Readiness checks are read-only; they do not install or start Docker. The main app’s queue is bounded, and concurrent API uploads cannot bypass its post-read capacity check.</p><p class="source-line"><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/backend/run_lhmpp.py">Container job adapter</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/backend/app.py">API and queue</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/CONTRACTS.md">Exact contract</a></p></details>
+
+  <h3 class="subsection" id="asset">5.2 / The artifact is more than a PLY</h3>
+  <p>A conventional static PLY provides splat appearance in a particular configuration. Our browser also needs the rig, bindings and deformation semantics. We package these as a JSON manifest plus aligned, little-endian typed arrays; the loader verifies the complete binary’s byte length and SHA-256.</p>
+  <div class="table-wrap"><table><thead><tr><th>Asset component</th><th>What it preserves</th><th>Why it matters</th></tr></thead><tbody>
+    <tr><td>Gaussian attributes</td><td>Zero-pose centers, predicted quaternions, activated scales, RGB and opacity.</td><td>These are runtime values, not untreated PLY logits or log-scales.</td></tr>
+    <tr><td>Rig and shape</td><td>55 named joints, parents, rest positions and the chosen shape parameters.</td><td>Motion must be interpreted against the correct skeleton and body proportions.</td></tr>
+    <tr><td>Exact sparse skinning</td><td>CSR offsets, bone indices and every nonzero weight.</td><td>No top-four pruning or new normalization changes the native model.</td></tr>
+    <tr><td>Native deformation data</td><td>Per-splat neutral linear transforms; expression directions; model-specific region and rotation-lock behavior.</td><td>Joint names alone cannot reproduce the native Gaussian deformation.</td></tr>
+    <tr><td>Provenance and validation</td><td>Model identity, hashes, array layouts and reference pose definitions; v2 fixtures in a separate binary.</td><td>Reproducibility, corruption detection and native/browser comparison.</td></tr>
+  </tbody></table></div>
+  <p>LHM++ requires its own export logic even though it can use the same validated browser math. Its diffused volumetric skinning weights are evaluated at the predicted offsets, with native fixed bindings retained for hands and face. Baking is permitted only after checking that expression directions outside those fixed regions are zero. Unlike original LHM, this adapter exports no constrained-body rotation locks.</p>
+  <p class="source-line"><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/backend/export_lhm.py">LHM export</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/generation-lab/lhmpp/export_portable.py">LHM++ export</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/CONTRACTS.md">Array and deformation specification</a></p>
+
+  <h3 class="subsection" id="compact">5.3 / Compact the representation without changing its math</h3>
+  <p>Version 2 omits expression rows that are numerically zero for every coefficient, retains all nonzero float32 values, and moves native reference arrays out of the normal playback download. This is exact numeric sparsity and packaging—not learned compression, skin-weight pruning or quantization.</p>
+  <figure class="diagram">
+    <div class="figure-top"><span>FIG 05 / A MEASURED EIGHT-VIEW LHM++ ASSET</span><span>Decimal MB · one specific export</span></div>
+    <div class="budget-bars">
+      <div class="budget-row"><span>Original dense binary</span><div class="budget-track"><span style="width:100%"></span></div><b>267.73 MB</b></div>
+      <div class="budget-row"><span>v2 runtime binary</span><div class="budget-track"><span style="width:34.56%"></span></div><b>92.53 MB</b></div>
+      <div class="budget-row"><span>Optional validation</span><div class="budget-track"><span style="width:11.71%"></span></div><b>31.36 MB</b></div>
+    </div>
+    <figcaption>The runtime keeps 40K expression-bearing vertices out of 160K splats, retaining all 12 million nonzero expression values. Validation is fetched on demand; explicit ZIP export includes it. Original dense assets and hashes remain unchanged.</figcaption>
+  </figure>
+  <p class="source-line"><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/backend/pack_asset.py">Compact packer</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/tests/asset_v2.test.mjs">Compatibility tests</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/evidence.md">Measured web MVP report</a></p>
+
+  <h3>5.4 / Source photos remain attached to the saved result</h3>
+  <p>Opening a saved avatar restores its ordered normalized input photos and supported generation settings. The API exposes a bounded source-photo catalog and numeric image routes; legacy research inputs require explicit mapping and recorded hashes. The UI distinguishes saved inputs from a new selection, clears stale previews on avatar changes, and prevents late responses or missing images from silently producing the wrong regeneration input set.</p>
+  <p class="small">This is provenance and product workflow, not part of LHM’s reconstruction method. Photos and avatar data persist locally; replacing the creation-panel selection does not rewrite a saved avatar. See <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/backend/source_photos.py">source_photos.py</a> and <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/evidence.md">the September 10 verification</a>.</p>
+
+  <h3 class="subsection" id="generation-research">5.5 / How we choose the next generator</h3>
+  <div class="cols">
+    <article class="card"><h4>Executed engineering experiments</h4><p>LHM 500M/1B × zero/estimated shape across three bundled inputs; LHM++ 1/4/8-view export and browser trials; IDOL native reconstruction, compact correction and full browser geometry in an isolated lab.</p></article>
+    <article class="card"><h4>The research decision still missing</h4><p>A consented, held-out identity and motion benchmark. Keep photo count, preprocessing, shape fitting and renderer controlled; report native quality and portable quality separately.</p></article>
+  </div>
+  <p>Start with three smoke subjects, then a reserved ten-subject decision set. For the multi-photo lane, use nested 1/4/8-image inputs and independent holdout views. Evaluate silhouette, face/hair/clothing detail, unseen regions, motion artifacts, creation cost, asset size and sustained client performance. Use pixel metrics only with properly aligned references; compare different models through images or geometry, not pointwise Gaussian indices.</p>
+  <div class="callout info"><span class="mini">Portability is a gate, not a file extension</span>IDOL demonstrates why: pose correctives, native hand conventions, fresh posed-neighbor scale estimation and full covariance required a new runtime. Its 99 passing geometry cases do not automatically make it compatible with our Mixamo, recording, remote or upload paths.</div>
+  <p class="source-line"><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/research.md">Frozen experimental questions &amp; acceptance rules</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/generation-lab/idol/README.md">IDOL’s remaining integration gates</a></p>
+</section>
+
+
+<section class="chapter pillar-heading" id="control">
+  <p class="chapter-kicker"><span>06</span>Pillar II / control &amp; animation pipeline</p>
+  <h2>Many inputs. One resolved performance.</h2>
+  <p class="section-intro">At the control layer, this works much like a conventional character rig: animate joints and expression parameters. The difference is what follows the rig—the visible surface is made of Gaussians, and its deformation must match the originating model.</p>
+  <nav class="chapter-jump" aria-label="Control and animation topics"><a href="#pose">Pose contract</a><a href="#signals">Signal adapters</a><a href="#mixamo">Mixamo</a><a href="#deformation">Deformation</a><a href="#rendering">Browser runtime</a><a href="#recording">Recording</a></nav>
+  <h3 class="subsection" id="pose">6.1 / A resolved pose is the common language</h3>
+  <figure class="diagram svg-wrap">
+    <div class="figure-top"><span>FIG 06 / RESOLVE ONCE, CONSUME EVERYWHERE</span><span>No input-specific logic at the receiver</span></div>
+    <svg viewBox="0 0 900 330" role="img" aria-labelledby="pose-title pose-desc">
+      <title id="pose-title">Different control inputs converge on one complete pose shared by rendering, recording and networking</title>
+      <desc id="pose-desc">Manual joints, procedural motion, Mixamo FBX, head and hand targets, and camera tracking pass through their adapters into a resolved pose. Local deformation, recording and network transmission all consume that same pose.</desc>
+      <rect class="bluebox" x="5" y="10" width="233" height="50" rx="7"/><text class="label" x="21" y="40">Manual joints / procedural</text>
+      <rect class="bluebox" x="5" y="81" width="233" height="50" rx="7"/><text class="label" x="21" y="111">Mixamo → retarget + sample</text>
+      <rect class="bluebox" x="5" y="152" width="233" height="50" rx="7"/><text class="label" x="21" y="182">Head + hands → bounded IK</text>
+      <rect class="bluebox" x="5" y="223" width="233" height="50" rx="7"/><text class="label" x="21" y="253">Camera → tracking adapter</text>
+      <path class="edge" d="M246 35H274V145H320"/><path class="edge" d="M246 106H284V145H320"/><path class="edge" d="M246 177H294V145H320"/><path class="edge" d="M246 248H304V145H320"/>
+      <rect class="box" x="332" y="70" width="241" height="151" rx="10"/><text class="label" x="355" y="103">Resolved pose</text><text class="sub" x="355" y="132">Actor root position + rotation</text><text class="sub" x="355" y="155">55 local joint rotations</text><text class="sub" x="355" y="178">100 expressions + simulation tick</text><text class="tiny" x="355" y="202">Discontinuity flag when required</text>
+      <path class="edge" d="M583 145H621V61H654"/><path class="edge" d="M583 145H654"/><path class="edge" d="M583 145H621V229H654"/>
+      <rect class="box" x="665" y="34" width="230" height="55" rx="7"/><text class="label" x="682" y="58">Deform + render</text><text class="sub" x="682" y="78">The sender’s local view</text>
+      <rect class="box" x="665" y="118" width="230" height="55" rx="7"/><text class="label" x="682" y="142">Record / replay</text><text class="sub" x="682" y="162">The actual resolved performance</text>
+      <rect class="box" x="665" y="202" width="230" height="55" rx="7"/><text class="label" x="682" y="226">Encode + send GSW2</text><text class="sub" x="682" y="246">The receiver’s source of truth</text>
+      <text class="sub" x="332" y="302">Control modes are alternatives today—not a layered animation graph.</text>
+    </svg>
+  </figure>
+  <div class="table-wrap"><table><thead><tr><th>Field</th><th>Meaning</th><th>Convention</th></tr></thead><tbody>
+    <tr><td><code>rootPosition</code></td><td>The actor’s position in the shared world.</td><td>Three values, meters.</td></tr>
+    <tr><td><code>rootRotation</code></td><td>The actor’s orientation, separate from pelvis articulation.</td><td>Normalized quaternion, xyzw order.</td></tr>
+    <tr><td><code>angles</code></td><td>55 local joint rotations in the asset’s named hierarchy.</td><td>165 axis-angle components, radians; not Euler angles.</td></tr>
+    <tr><td><code>expression</code></td><td>The model’s 100 expression coefficients.</td><td>Learned basis coordinates; not a semantic “smile” / “blink” API.</td></tr>
+    <tr><td><code>tick</code> / <code>teleport</code></td><td>Simulation identity and an optional interpolation-reset marker.</td><td>Seek, loop wrap and discontinuities must not create false in-between motion.</td></tr>
+  </tbody></table></div>
+  <p>The main app uses right-handed, Y-up SMPL-X space. A Unity adapter must explicitly convert units, handedness, vectors and rotations. <strong>Actor root and pelvis rotation are different controls:</strong> one places the whole avatar; the other articulates a joint inside it.</p>
+  <p class="source-line"><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/src/engine.mjs">Pose, FK and interpolation reference</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/CONTRACTS.md">Contract specification</a></p>
+
+  <h3 class="subsection" id="signals">6.2 / How a set of signals becomes an animation</h3>
+  <div class="table-wrap"><table><thead><tr><th>Input source</th><th>Adapter behavior</th><th>What is / is not established</th></tr></thead><tbody>
+    <tr><td>Manual controls</td><td>Set root, joint rotations, jaw / finger values and raw expression coefficients.</td><td>Direct observability of rig and deformation; not an artist-authored facial rig.</td></tr>
+    <tr><td>Procedural motion</td><td>Time-dependent joint curves produce wave, walk, squat and turn demonstrations.</td><td>Control plumbing and continuity; not captured human motion or locomotion physics.</td></tr>
+    <tr><td>Head + hand targets</td><td>Convert calibrated world-space anchors into actor space; solve torso before arms; apply orientation / grip controls.</td><td>Bounded illustrative IK. Head and hands do not uniquely observe feet, knees or the full torso.</td></tr>
+    <tr><td>Webcam</td><td>Local MediaPipe body, hand and face tasks; map available tracking into our controls with calibration and stale-input handling.</td><td>Experimental perception adapter; real face/hand quality and robust world travel remain unproven.</td></tr>
+    <tr><td>Mixamo FBX</td><td>Rest-aware retargeting, baked joint samples and scaled root motion.</td><td>Real skeletal animation works; Mixamo supplies no facial expression stream in this adapter.</td></tr>
+  </tbody></table></div>
+  <div class="cols">
+    <article class="card"><h4>Sparse-target IK is our adapter—not LHM</h4><p>The bounded solver performs up to 12 iterations per chain with coarse joint clamps. Its inputs represent calibrated joint anchors, not raw headset/controller origins. A future device adapter must supply the user calibration and device-to-joint offsets.</p></article>
+    <article class="card"><h4>Tracking is not semantic facial control</h4><p>MediaPipe supplies perception; our code converts it to avatar signals. A detected facial coefficient cannot simply be copied into LHM’s unrelated learned expression basis. A validated semantic mapping is a separate design task.</p></article>
+  </div>
+  <details><summary>Camera scheduling, privacy and limits</summary><p>The camera is explicitly enabled by the user. Tracking runs locally in a separate worker with 640 × 480 input, at most one frame in flight, an approximately 85 ms submission throttle and a 500 ms stale threshold. Switching away releases the device. The prototype does not transmit webcam frames as its avatar transport, does not capture audio, and does not establish reliable body position from monocular video.</p><p class="source-line"><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/src/tracking.ts">Tracking adapter</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/src/tracking.worker.ts">Tracking worker</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/src/controls.mjs">Procedural and target controls</a><a href="https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker/web_js">MediaPipe source documentation</a></p></details>
+
+  <h3 class="subsection" id="mixamo">6.3 / Reuse skeletal animation through retargeting</h3>
+  <p>Yes—Mixamo motion can animate the Gaussian avatar because the model has an articulated body rig. We use the FBX skeleton and motion only: the source mesh and textures are not rendered, and the avatar does not need to be uploaded to Mixamo or generated again.</p>
+  <figure class="diagram dark">
+    <div class="figure-top"><span>FIG 07 / MOTION DATA → OUR POSE CONTRACT</span><span>Import once · sample continuously</span></div>
+    <div class="pipeline">
+      <div class="stage"><span class="n">01</span><b>Read FBX</b><small>Three.js parser<br>Actual source bind/rest</small></div>
+      <div class="stage"><span class="n">02</span><b>Align skeletons</b><small>Axes + A/T stance<br>52 body/finger mappings</small></div>
+      <div class="stage"><span class="n">03</span><b>Bake at 30 Hz</b><small>Worker conversion<br>Local rotations + travel</small></div>
+      <div class="stage"><span class="n">04</span><b>Sample the clip</b><small>Time, speed, loop<br>Quaternion interpolation</small></div>
+      <div class="stage"><span class="n">05</span><b>Resolve pose</b><small>Render, record, send<br>Same downstream path</small></div>
+    </div>
+    <figcaption style="color:#c7d7cd">The receiver needs the avatar and resolved poses—not the original FBX, Mixamo account or retargeter.</figcaption>
+  </figure>
+  <p>We preserve the target’s rest-joint positions and bone lengths. Source animated rotations are measured relative to the actual bind pose, transformed into a common anatomical frame, and corrected for the source/target rest stance. The first dancing frame is never assumed to be a T-pose.</p>
+  <div class="equation">G(t) = C · Q(t) · B⁻¹ · C⁻¹ · A<small>Q(t): source world rotation · B: source bind rotation · C: coordinate alignment · A: rest-stance correction. Convert desired world rotations G(t) into target-local rotations through the target hierarchy.</small></div>
+  <p>Hips displacement is scaled by the target/source mean leg length. X/Z travel is centered on the first frame; vertical motion is relative to the source bind pose. “In place” removes horizontal travel but preserves vertical motion. Jaw, eyes and the 100 expression coefficients remain independent of the 52 mapped body/finger joints.</p>
+  <details><summary>Import boundaries and unsupported motion</summary><p>Parsing and the 30 Hz bake occur in a local worker; textures are ignored and FBX files are not uploaded. Limits are 64 MiB per file, 12 files per batch, 16 takes / five minutes per file and a 45-second conversion timeout. A matching source-character T-pose can repair unavailable rest information for future imports. Mirrored/non-uniform skeleton scale, animated scale and translations below the hips are rejected.</p><p>The library is in memory. There is no crossfade, animation state machine, foot planting, collision response, root-motion accumulation across loops or secondary clothing physics. Retargeting uses standard geometric ideas; our contribution is the concrete rest-aware adapter and its verification.</p><p class="source-line"><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/MIXAMO.md">Detailed motion contract</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/src/mixamo.mjs">Retargeter</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/tests/mixamo.test.mjs">Independent FK tests</a><a href="https://threejs.org/docs/pages/FBXLoader.html">Three.js FBXLoader</a></p></details>
+
+
+  <h3 class="subsection" id="deformation">6.4 / Reproduce the native deformation—not a plausible substitute</h3>
+  <p>For each Gaussian, the worker blends the exported joint transforms using <em>every</em> stored skinning influence. It then applies expression displacement, the model’s orientation rule and the separate actor-root transform.</p>
+  <div class="equation">P = Σⱼ wⱼ Tⱼ<br>center = actorRoot · P · [x₀ + E e, 1]<br>rotation = rootQ · normalize(matrixToQuaternion(P.linear · N)) · q₀<small>P: weighted posed joint transform · x₀: exported zero-pose center · E/e: expression directions/coefficients · N: exported neutral linear transform · q₀: predicted Gaussian orientation.</small></div>
+  <div class="cols">
+    <article class="card"><h4>Model-specific details are part of the contract</h4><p>For LHM’s constrained body points, omit the middle orientation term. The matrix-to-quaternion conversion follows PyTorch3D’s largest-candidate algorithm even when the blended matrix is non-orthogonal. Scales, colors and opacity stay as exported.</p></article>
+    <article class="card"><h4>Correct implementation ≠ physical truth</h4><p>We match LHM’s chosen orientation and deformation model. We do not replace it with a different covariance-transport rule, nor claim that exact matching creates realistic cloth, anatomical limits or accurate unseen appearances.</p></article>
+  </div>
+  <p>Seven native fixtures compare all centers and orientations before renderer packing. The acceptance thresholds are less than 1 mm center error and less than 0.002 radians orientation error. Additional CPU/GPU stress poses exercise all expressions and actor-root transforms. These test portability, not cross-model identity quality or pixel-identical rasterization.</p>
+  <p class="source-line"><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/src/engine.mjs">CPU deformation and FK reference</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/src/gpu-deform.mjs">WebGPU implementation</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/tests/engine.test.mjs">Native parity tests</a></p>
+
+  <h3 class="subsection" id="rendering">6.5 / A browser runtime with explicit performance boundaries</h3>
+  <figure class="diagram svg-wrap">
+    <div class="figure-top"><span>FIG 08 / MAIN-APP EXECUTION PATH</span><span>WebGPU compute → readback → WebGL rendering</span></div>
+    <svg viewBox="0 0 900 275" role="img" aria-labelledby="runtime-title runtime-desc">
+      <title id="runtime-title">The main app uses CPU forward kinematics and optional WebGPU deformation, with float32 readback into Spark</title>
+      <desc id="runtime-desc">A pose reaches a persistent deformation worker. CPU forward kinematics produces joint matrices. WebGPU deforms every Gaussian, then its float32 results are read back and uploaded to the Spark WebGL renderer. A CPU deformation path can bypass the GPU compute stage. This is not zero-copy rendering.</desc>
+      <rect class="box" x="5" y="25" width="140" height="98" rx="8"/><text class="label" x="20" y="56">Resolved pose</text><text class="sub" x="20" y="82">One in flight</text><text class="sub" x="20" y="103">Worker request</text>
+      <path class="edge" d="M153 75H181"/>
+      <rect class="box" x="190" y="25" width="140" height="98" rx="8"/><text class="label" x="207" y="56">CPU FK</text><text class="sub" x="207" y="82">55 joints</text><text class="sub" x="207" y="103">Skin matrices</text>
+      <path class="edge" d="M338 75H367"/>
+      <rect class="box" x="375" y="25" width="150" height="98" rx="8"/><text class="label" x="391" y="56">WebGPU</text><text class="sub" x="391" y="82">Full influences</text><text class="sub" x="391" y="103">Sparse expressions</text>
+      <path class="edge" d="M534 75H560"/>
+      <rect class="amberbox" x="568" y="25" width="145" height="98" rx="8"/><text class="label" x="583" y="56">Readback</text><text class="sub" x="583" y="82">Float32 results</text><text class="sub" x="583" y="103">Transfer + unpack</text>
+      <path class="edge" d="M722 75H744"/>
+      <rect class="bluebox" x="752" y="25" width="143" height="98" rx="8"/><text class="label" x="768" y="56">Spark / WebGL</text><text class="sub" x="768" y="82">Update splats</text><text class="sub" x="768" y="103">Sort + draw</text>
+      <path d="M260 132V189H366" class="edge dashed"/>
+      <rect class="box" x="375" y="159" width="338" height="61" rx="8"/><text class="label" x="392" y="185">CPU deformation: baseline / fallback</text><text class="sub" x="392" y="206">Same asset and native math, lower pose rate at 160K</text>
+      <path d="M722 189H822V134" class="edge dashed"/>
+      <text class="sub" x="5" y="256">Persistent deformation worker · separate camera and FBX workers · main-thread scene and UI</text>
+    </svg>
+    <figcaption>The main app is not zero-copy GPU rendering. Its reported deformation wall time includes FK, upload, dispatch, readback and unpacking. IDOL’s isolated GPU-resident diagnostic renderer is a different path.</figcaption>
+  </figure>
+  <p>The worker attempts WebGPU automatically for assets with at least 100K splats. The 40K LHM baseline remains on CPU by default. Initialization, limit, device-loss or verification failures report a reason and fall back to the CPU reference without substituting a different skinning approximation. Only one deformation request is in flight; render refresh and pose-update scheduling are measured separately.</p>
+  <p>Spark and Three.js provide the splat and scene rendering infrastructure. Our integration updates the Gaussian centers and rotations through texture-aligned extended splat data. The viewport can refresh between new deformations: approximately 55 display FPS with 30 pose updates per second is <em>not</em> 55 newly deformed poses per second.</p>
+  <p class="source-line"><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/src/deform.worker.mjs">Persistent worker</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/src/viewer.ts">Viewer integration</a><a href="https://sparkjs.dev/docs/">Spark documentation</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/evidence.md">GPU / fallback evidence</a></p>
+
+  <h3 class="subsection" id="recording">6.6 / Record the result, not the controller instructions</h3>
+  <p>Recording stores resolved poses, including the actor root, joint rotations, expressions and timing. This makes replay independent of the original procedural clock, webcam inference, IK solution or FBX importer. A download includes asset identity and checksum so the performance can be associated with its avatar.</p>
+  <div class="contract-ribbon"><div><b>Continuous motion</b><span>Interpolate root and articulation from the same pair of snapshots. Convert rotations to quaternions and use shortest-arc slerp.</span></div><div><b>Discontinuous motion</b><span>On seeks, clip changes, loop wraps or teleports, hold / jump across the boundary instead of fabricating a slide through unrelated poses.</span></div></div>
+  <p class="small">Current recordings are capped at 60 seconds and remain in memory until downloaded as JSON. The MVP has no recording-import UI or persistent motion library. Main-app record/replay is not yet an IDOL feature.</p>
+  <div class="callout warn"><span class="mini">New design work beyond the MVP</span>Semantic face calibration; robust full-body solving with confidence and contact constraints; motion blending and state transitions; head/body seam handling if a specialist is added; and target-device deformation / rendering budgets. None is automatically solved by generating a rigged avatar.</div>
+</section>
+
+
+<section class="chapter pillar-heading" id="network">
+  <p class="chapter-kicker"><span>07</span>Pillar III / network transport</p>
+  <h2>Distribute the identity.<br>Stream only the performance.</h2>
+  <p class="section-intro">The network carries two kinds of data with different lifetimes: a large, stable avatar asset and small, frequent pose snapshots. No live pixels or per-Gaussian positions are sent through the pose relay.</p>
+  <figure class="diagram svg-wrap">
+    <div class="figure-top"><span>FIG 09 / TWO DATA LIFETIMES</span><span>Asset over HTTP(S) · motion over WS(S)</span></div>
+    <svg viewBox="0 0 900 370" role="img" aria-labelledby="network-title network-desc">
+      <title id="network-title">The sender and receiver share a downloaded asset and communicate through compact pose snapshots</title>
+      <desc id="network-desc">A stored avatar manifest and binary are downloaded and checksum-verified by the sender and receiver. The sender resolves a pose and sends a GSW2 snapshot through a relay. The receiver buffers complete snapshots, deforms the matching asset and renders from its own camera.</desc>
+      <rect class="bluebox" x="323" y="5" width="255" height="73" rx="8"/><text class="label" x="344" y="34">Stored avatar asset</text><text class="sub" x="344" y="58">Manifest + binary + SHA-256</text>
+      <path class="edge dashed" d="M315 43H130V126"/><text class="sub" x="20" y="33">Load once per asset</text>
+      <path class="edge dashed" d="M587 43H774V126"/><text class="sub" x="647" y="33">Download + verify identity</text>
+      <rect class="box" x="5" y="139" width="255" height="182" rx="9"/><text class="label" x="24" y="171">Sender browser</text><text class="sub" x="24" y="200">Input adapter → resolved pose</text><text class="sub" x="24" y="225">Local deform / render / record</text><text class="sub" x="24" y="282">Send one complete snapshot</text>
+      <path class="edge" d="M269 221H318"/>
+      <rect class="box" x="329" y="183" width="244" height="93" rx="9"/><text class="label" x="350" y="212">WebSocket room relay</text><text class="sub" x="350" y="237">GSW2 · nominal 30 Hz</text><text class="sub" x="350" y="259">One sender per room</text>
+      <path class="edge" d="M582 221H631"/>
+      <rect class="box" x="642" y="139" width="253" height="182" rx="9"/><text class="label" x="662" y="171">Receiver browser</text><text class="sub" x="662" y="200">Validate sequence + dimensions</text><text class="sub" x="662" y="225">80 ms arrival-time pose buffer</text><text class="sub" x="662" y="257">Same deformation, local camera</text><text class="sub" x="662" y="282">No tracker, IK or FBX required</text>
+      <text class="sub" x="15" y="352">Reliable room metadata selects the asset before live poses are consumed.</text>
+    </svg>
+    <figcaption>“Once” refers to the performance session / asset lifetime, not a promised permanent cross-session cache. The receiver verifies the same asset and never regenerates it from the sender’s photos.</figcaption>
+  </figure>
+  <h3>7.1 / GSW2: the wire representation we designed</h3>
+  <p>The main app encodes the resolved pose as a versioned, little-endian binary snapshot. The asset’s expression semantics remain model-specific; packet versioning does not turn them into a universal facial vocabulary.</p>
+  <div class="packet-wrap"><div class="packet" role="img" aria-label="Packet layout: 28-byte header, 28-byte actor root, 330-byte joint rotations, zero to 400 bytes of sparse expression entries">
+    <div><b>28 B</b>Header<br>Version, counts, seq, tick, time</div>
+    <div><b>28 B</b>Actor root<br>Position + quaternion</div>
+    <div><b>330 B</b>55 joint rotations<br>165 quantized axis-angle components</div>
+    <div><b>0–400 B</b>Sparse expressions<br>4 bytes per active coefficient</div>
+  </div></div>
+  <div class="table-wrap"><table><thead><tr><th>Payload</th><th>Encoding</th><th>Behavior</th></tr></thead><tbody>
+    <tr><td>Header</td><td>Magic / version; teleport flag; bone and expression counts; active-expression count; sequence; tick; float64 capture time.</td><td>Reject malformed lengths and incompatible dimensions; sequence handling is wraparound-aware.</td></tr>
+    <tr><td>Actor root</td><td>Three float32 position values + four float32 xyzw quaternion values.</td><td>Root is transmitted atomically with articulation. Quaternions are normalized on decode.</td></tr>
+    <tr><td>Joint rotations</td><td>55 × 3 signed int16 components; scale 32767 / π.</td><td>Canonical shortest-equivalent axis-angle before quantization; rotations interpolate via quaternion slerp.</td></tr>
+    <tr><td>Expressions</td><td>For each nonzero coefficient: uint16 index + int16 value scaled by 1000.</td><td>Reject duplicate indices, invalid values and dimensions; omitted entries decode as zero.</td></tr>
+  </tbody></table></div>
+  <div class="cols">
+    <article class="card chosen"><h4>Normal, zero-expression pose</h4><p><strong>386 bytes × 30 Hz = 11,580 B/s ≈ 92.6 kbps.</strong> This is calculated pose payload only.</p></article>
+    <article class="card"><h4>All 100 expressions active</h4><p><strong>786 bytes × 30 Hz = 23,580 B/s ≈ 188.6 kbps.</strong> Transport overhead and asset download are additional.</p></article>
+  </div>
+  <p class="source-line"><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/src/protocol.mjs">Encoder, decoder and pose buffer</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/CONTRACTS.md">Byte offsets and validation rules</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/backend/app.py">Room relay</a></p>
+
+  <h3>7.2 / Receiver behavior is part of the animation design</h3>
+  <ol class="steps">
+    <li><strong>Resolve identity first.</strong>A reliable room message announces the avatar identity. Download and checksum-validate the asset before accepting motion for it.</li>
+    <li><strong>Keep snapshots coherent.</strong>Reject stale sequences and invalid packets. Never combine the root from one instant with limbs from another.</li>
+    <li><strong>Buffer by arrival time.</strong>The current receiver uses an 80 ms buffer and one snapshot pair for the entire body. The carried sender timestamp is diagnostic; no cross-machine clock synchronization is claimed.</li>
+    <li><strong>Handle gaps and discontinuities explicitly.</strong>Hold the newest complete pose when data runs out. A teleport clears interpolation history. Do not invent motion across a clip seek or unrelated timeline segment.</li>
+  </ol>
+  <div class="callout warn"><span class="mini">What this transport experiment does not prove</span>WebSocket is reliable and ordered. The latency / jitter / loss controls are application-level impairment experiments, not a reproduction of unreliable WebRTC or UDP behavior. There is no extrapolation, clock-drift correction, reconnect/resend protocol or production congestion tuning.</div>
+  <h3>7.3 / What carries forward—and what needs a new design</h3>
+  <p>Carry forward the separation of identity and motion, explicit coordinate/schema semantics, complete snapshots, native-deformation parity and discontinuity handling. For an Internet product, establish multi-user authorization, asset-cache policy, reconnect behavior, pose age and clock handling, bounded send queues, congestion behavior and a transport choice appropriate to loss and latency. WebRTC data channels are a candidate, not an implemented feature.</p>
+  <p>The older Python/C# experiment used a different 50-expression packet. It is <strong>not wire-compatible with current GSW2</strong> and cannot count as proof of the current Unity receiver. Port the current contract and test vectors explicitly.</p>
+  <p class="small">Password protection and Tailscale Funnel are access / routing layers described in <a href="#operations">operations</a>. They do not change the avatar payload into a new transport protocol or establish WAN performance.</p>
+</section>
+
+
+<section class="chapter" id="proof">
+  <p class="chapter-kicker"><span>08</span>Evidence and limits</p>
+  <h2>What is actually proven?</h2>
+  <p class="section-intro">Four claims need different tests: a native model can run; its exported geometry is faithful; the interaction works visibly; and the avatar is good enough for people on a target device. We have substantial evidence for the first three—not a blanket proof of the fourth.</p>
+  <div class="evidence-grid">
+    <div class="evidence"><strong>84</strong><span>LHM native pose cases</span><small>12 model/shape/input configurations × 7 poses · September 8</small></div>
+    <div class="evidence"><strong>160K</strong><span>LHM++ splats in the main app</span><small>Compact assets + full-influence GPU deformation · September 8</small></div>
+    <div class="evidence"><strong>99 / 99</strong><span>IDOL browser geometry cases</span><small>Distinct full-deformation lab, not main-app promotion · September 9</small></div>
+  </div>
+  <div class="callout"><span class="mini">Public evidence boundary</span>The original research screenshot and native avatar artifacts are not redistributed. The public repository generates its own synthetic avatar from analytic geometry. It proves the software path—not photo-reconstruction quality. Historical native measurements below are reported observations from the private research workspace; see <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/evidence.md">evidence and reproduction limits</a>.</div>
+  <div class="table-wrap"><table><thead><tr><th>Claim</th><th>Recorded evidence</th><th>Limit / source</th></tr></thead><tbody>
+    <tr><td>Fresh LHM reconstruction works</td><td>12 configurations across three bundled inputs, two checkpoints and two shape modes; 84 native pose checks pass.</td><td>500M whole-process jobs: 31.40–32.54 s; 1B: 41.41–42.66 s. Not repeated p95 per configuration or a held-out quality study. <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/evidence.md">September 8 report</a>.</td></tr>
+    <tr><td>LHM-family deformation is portable</td><td>All-Gaussian native center/orientation fixtures; CPU and WebGPU paths; expression and actor-root stress checks.</td><td>Less than 1 mm / 0.002 rad before renderer packing; not pixel-identical Python/WebGL images. <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/CONTRACTS.md">Acceptance contract</a>.</td></tr>
+    <tr><td>LHM++ is an integrated option</td><td>1/4/8-view engineering sweep; 160K splats; ~92.5 MB runtime; ~30 pose updates/sec and ~55 display FPS on the desktop; tested CPU fallback.</td><td>Not a demonstrated identity-quality win. Earlier dense CPU results are a different runtime snapshot. <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/evidence.md">Web implementation report</a>.</td></tr>
+    <tr><td>Real Mixamo motion works</td><td>Samba: 18.20 s, 548 baked samples, 52 mapped joints; 1,950 independent FK direction comparisons, maximum error ~0.000154°.</td><td>Supports interaction, record/replay and remote checks; not all Mixamo files, anatomical realism or foot-contact correctness. <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/evidence.md">Detailed verification</a>.</td></tr>
+    <tr><td>IDOL full browser geometry works in isolation</td><td>99/99 cases including joint transforms, centers, fresh exact three-neighbor sizes and full covariance. Four visible input probes. GPU-resident demo: 55.2 freshly deformed FPS over three 10-second windows on RTX 4090.</td><td>~104.3–104.4 MB single-avatar package. Not sustained/device testing, native CUDA pixel parity, main-app uploads, Mixamo or remote support. <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/evidence.md">Full IDOL evidence</a>.</td></tr>
+    <tr><td>Saved photos restore correctly</td><td>All 28 installed avatars have complete source-photo sets. September 10 scoped run: 11 browser tests; 28 Python passes + 1 OS-dependent skip; 25 JavaScript passes; TypeScript/build pass.</td><td>Scoped suites, not a fresh execution of every historical browser test. No avatar regeneration was performed. <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/evidence.md">Regression scope and retained failures</a>.</td></tr>
+    <tr><td>Protected HTTPS and WSS work on the workstation</td><td>26-check authenticated HTTPS record; protected photo/asset routes, visible splats, animation and pose delivery; unauthenticated routes rejected.</td><td>Does not settle outside-tailnet DNS/reachability or measure WAN latency. <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/evidence.md">September 10 record</a>.</td></tr>
+  </tbody></table></div>
+  <div class="callout warn"><span class="mini">Important negative results / open claims</span>We have not established a cross-model quality winner, calibrated semantic facial control, robust real-world camera hands/face, physical clothing, multi-person production networking, Unity parity, or standalone Quest performance. High display FPS and passing numerical tests do not establish those outcomes.</div>
+  <details><summary>How to interpret the performance numbers</summary><p>Keep model inference, whole-process generation, GPU memory, deformation work, delivered fresh poses and displayed frames separate. LHM job times include process overhead; sampled whole-GPU memory is not framework allocator memory. The IDOL 55.2 FPS resident path differs from its 9.4 FPS CPU-transfer/WebGL bridge and from its geometry-only timings. None of these measurements is a smartphone or Quest benchmark.</p><p>Native parity compares an asset against its own native deformation. A cross-model comparison must instead use appropriate image/geometry criteria. A limited smoke test on bundled inputs cannot establish general identity preservation.</p></details>
+</section>
+
+<section class="chapter" id="unity">
+  <p class="chapter-kicker"><span>09</span>Roadmap and decision gates</p>
+  <h2>What we must establish next</h2>
+  <p class="section-intro">The browser is the executable reference, not the final proof of a headset product. Preserve what is already validated, and make each new claim pass its own gate.</p>
+  <div class="timeline">
+    <article><small>GATE 01 / RESEARCH</small><h4>Choose on held-out quality</h4><p>Consented subjects, fixed input budgets, failure taxonomy and independent views. Decide whether LHM++ or IDOL earns a quality tier or replaces the baseline.</p></article>
+    <article><small>GATE 02 / PORTABILITY</small><h4>Complete model / engine adapters</h4><p>IDOL motion and app integration; then C# asset loading, FK and deformation against the current native fixtures and GSW2 tests.</p></article>
+    <article><small>GATE 03 / DEVICES</small><h4>Calibrate and render in stereo</h4><p>Device-to-joint offsets, handedness, tracking confidence, loss behavior, eye cameras, depth/compositing and sustained memory/frame budgets.</p></article>
+    <article><small>GATE 04 / SHARING</small><h4>Prove an Internet session</h4><p>Independent public reachability, authorization, reconnects, controlled WAN tests and pose-age / latency reporting. Add multi-user isolation before product use.</p></article>
+  </div>
+  <h3>Unity / Meta responsibilities</h3>
+  <div class="table-wrap"><table><thead><tr><th>Boundary</th><th>What can carry forward</th><th>What needs new validation</th></tr></thead><tbody>
+    <tr><td>Avatar loading</td><td>Manifest, binary arrays, checksums, model identity and native fixtures.</td><td>C# parsing, buffer formats, endianness and lifetime management.</td></tr>
+    <tr><td>Animation</td><td>Resolved pose, actor root, exact deformation semantics and discontinuities.</td><td>Coordinate conversion, native parity and compute implementation on the chosen engine/device.</td></tr>
+    <tr><td>Input</td><td>The adapter → resolved-pose architecture.</td><td>Meta Movement / headset signals, tracking-to-joint calibration, confidence and contact behavior. Our webcam and simulated targets are not Meta integration.</td></tr>
+    <tr><td>Rendering</td><td>Explicit Gaussian attributes and diagnostic comparisons.</td><td>Stereo sorting / projection, compositing, occlusion, passthrough interactions and device budgets. No automatic Spark-to-Unity port is implied.</td></tr>
+    <tr><td>Transport</td><td>GSW2 semantics and test vectors.</td><td>A compatible receiver, sessions, network policy and impairment tests on actual devices.</td></tr>
+  </tbody></table></div>
+  <p>PCVR / Link and standalone Quest are separate deployment tracks. A workstation rendering experiment does not demonstrate a headset-local compute budget. VRGaussianAvatar’s shared stereo work is relevant to the stereo gate; Mon3tr’s distributed architecture is relevant to the sharing gate, but neither supplies our missing device measurements.</p>
+  <p class="source-line"><a href="https://github.com/oculus-samples/Unity-Movement">Meta Unity Movement reference</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/experimental/README.md">Original engine-ingest notes</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/experimental/README.md">Original device-control notes</a><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/research.md">Generation decision plan</a></p>
+  <div class="callout"><span class="mini">Candidate new research, not an established invention</span>Cross-model portable deformation, calibrated semantic control, error-bounded runtime reduction and perceptual quality under networking constraints are potential research questions. To claim novelty, formulate a specific method, compare it with prior work, and measure the improvement. The current implementation establishes an engineering foundation for that work.</div>
+</section>
+
+<section class="chapter" id="operations">
+  <p class="chapter-kicker"><span>10</span>Operations, privacy and reproducibility</p>
+  <h2>Keep the prototype useful—and bounded.</h2>
+  <div class="cols">
+    <article class="card"><h4>Run the public prototype</h4><p>Install Python 3.10+ and Node.js 24 LTS, then run from the repository root. Use <code>--port 8875</code> if another instance occupies the default port.</p><pre><code>python scripts/setup.py
+python scripts/serve.py
+<span class="comment"># Open http://127.0.0.1:8765</span></code></pre><p class="small">The quick start creates a synthetic avatar without photos or neural weights. Native generation is explicitly opt-in and needs the separate model/CUDA setup in <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/generation.md">the generation guide</a>.</p></article>
+    <article class="card"><h4>Password-protected preview</h4><p>Funnel targets the authentication gateway on loopback port 8766, which forwards to the unchanged application on 8765. Never publish the unprotected backend directly.</p><pre><code>HTTPS / WSS → Tailscale Funnel
+            → gateway :8766
+            → local app :8765</code></pre><p class="small">Credentials are intentionally omitted from this document. See the <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/deployment.md">preview runbook</a> for lifecycle and verification.</p></article>
+  </div>
+  <h3>Access protection is not multi-user isolation</h3>
+  <p>The separate gateway authenticates HTML, assets, uploads, API routes and WebSocket upgrades. It uses host/origin checks and Secure, HttpOnly, SameSite session cookies. It is a shared-password research preview: trusted testers with access can see the saved library and submit jobs. It is not an account system, tenant boundary or proof of production hardening.</p>
+  <p class="small">GitHub Pages hosts this static architecture document only. It does not run Python, accept photo uploads, host the avatar library, or expose a GPU. A live preview is a separate, explicitly authenticated deployment; no existing private endpoint is published here.</p>
+  <div class="callout warn"><span class="mini">Personal data and third-party rights</span>Uploaded and normalized photos, generated avatars and provenance persist locally; there is no automatic retention/deletion policy. Camera processing and FBX parsing remain local, but a shared preview exposes saved data to authorized testers. Use consented inputs. Review code, checkpoint, SMPL-X/FLAME, training-data and motion-asset terms separately before distribution or commercial use; an upstream repository license alone does not settle the whole dependency chain.</div>
+  <h3>Implementation map</h3>
+  <div class="table-wrap"><table><thead><tr><th>Part of the solution</th><th>Local source / specification</th></tr></thead><tbody>
+    <tr><td>Generation API, queue and model configuration</td><td><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/backend/app.py">app.py</a> · <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/backend/generation_config.py">generation_config.py</a></td></tr>
+    <tr><td>Native model exporters</td><td><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/backend/export_lhm.py">LHM adapter</a> · <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/generation-lab/lhmpp/export_portable.py">LHM++ adapter</a> · <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/generation-lab/idol/README.md">IDOL lab map</a></td></tr>
+    <tr><td>Asset compaction and saved inputs</td><td><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/backend/pack_asset.py">pack_asset.py</a> · <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/backend/source_photos.py">source_photos.py</a> · <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/CONTRACTS.md">contracts</a></td></tr>
+    <tr><td>FK, CPU/GPU deformation and rendering</td><td><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/src/engine.mjs">engine.mjs</a> · <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/src/gpu-deform.mjs">gpu-deform.mjs</a> · <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/src/deform.worker.mjs">worker</a> · <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/src/viewer.ts">viewer.ts</a></td></tr>
+    <tr><td>Signal / motion adapters</td><td><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/src/controls.mjs">controls.mjs</a> · <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/src/tracking.ts">tracking.ts</a> · <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/src/mixamo.mjs">mixamo.mjs</a> · <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/MIXAMO.md">motion contract</a></td></tr>
+    <tr><td>App state, recording and transport</td><td><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/src/main.ts">main.ts</a> · <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/src/protocol.mjs">protocol.mjs</a> · <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/deployment.md">protected-access runbook</a></td></tr>
+    <tr><td>Evidence and reproducibility</td><td><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/evidence.md">public verification notes</a> · <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/generation-lab/README.md">experiment record</a> · <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/package.json">pinned web dependencies</a></td></tr>
+  </tbody></table></div>
+  <p class="small">This public HTML is self-contained for reading: styles and diagrams are embedded; no participant photos or generated avatars are included. Source links point to GitHub. Private research reports are represented by the public evidence summary, not by downloadable artifacts. The research workspace and the public release have separate data directories.</p>
+</section>
+
+
+<section class="chapter" id="references">
+  <p class="chapter-kicker"><span>11</span>Reading list and terminology</p>
+  <h2>Sources, evidence and a shared vocabulary</h2>
+  <p class="section-intro">Papers explain the methods we inherit or learn from. Local code and dated reports establish what we actually implemented. Neither source category substitutes for the other.</p>
+  <h3>Primary research sources</h3>
+  <div class="source-grid"><div class="ref" id="ref-s01"><b>S01</b><a href="https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/">3D Gaussian Splatting for Real-Time Radiance Field Rendering</a><p>Kerbl et al., 2023. Representation and rasterization foundation.</p></div>
+<div class="ref" id="ref-s02"><b>S02</b><a href="https://smpl-x.is.tue.mpg.de/">Expressive Body Capture: 3D Hands, Face, and Body from a Single Image</a><p>Pavlakos et al., 2019. SMPL-X model, paper and access terms.</p></div>
+<div class="ref" id="ref-s03"><b>S03</b><a href="https://arxiv.org/abs/2503.10625">LHM: Large Animatable Human Reconstruction Model</a><p>Qiu et al., 2025. Our default generation family.</p></div>
+<div class="ref" id="ref-s04"><b>S04</b><a href="https://arxiv.org/abs/2506.13766v2">LHM++: Pose-free Images to 3D</a><p>Qiu et al., 2025; revised March 2026. Our integrated multi-photo family.</p></div>
+<div class="ref" id="ref-s05"><b>S05</b><a href="https://yiyuzhuang.github.io/IDOL/">IDOL: Instant Photorealistic 3D Human Creation from a Single Image</a><p>Zhuang et al., CVPR 2025. Independent UV-based challenger.</p></div>
+<div class="ref" id="ref-s06"><b>S06</b><a href="https://arxiv.org/abs/2608.20759">DiGS-Avatar: Single-Image Reconstruction via UV-Space Diffusion</a><p>Li et al., 2026. Conditional diffusion-prior challenger.</p></div>
+<div class="ref" id="ref-s07"><b>S07</b><a href="https://arxiv.org/html/2601.07518v1">Mon3tr: Monocular 3D Telepresence with Pre-built Gaussian Avatars</a><p>Lin et al., January 2026. Offline identity / live performance architecture.</p></div>
+<div class="ref" id="ref-s08"><b>S08</b><a href="https://arxiv.org/pdf/2602.01674">VRGaussianAvatar: Integrating 3D Gaussian Avatars into VR</a><p>February 2026. Sparse VR control, server-rendered stereo and embodiment evaluation.</p></div>
+<div class="ref" id="ref-s09"><b>S09</b><a href="https://arxiv.org/abs/2606.02573">HumanNOVA</a><p>Reviewed alternative; see its paper-ledger row for scope, lesson and decision.</p></div>
+<div class="ref" id="ref-s10"><b>S10</b><a href="https://arxiv.org/abs/2311.17910">HUGS</a><p>Reviewed alternative; see its paper-ledger row for scope, lesson and decision.</p></div>
+<div class="ref" id="ref-s11"><b>S11</b><a href="https://mks0601.github.io/ExAvatar/">ExAvatar</a><p>Reviewed alternative; see its paper-ledger row for scope, lesson and decision.</p></div>
+<div class="ref" id="ref-s12"><b>S12</b><a href="https://arxiv.org/abs/2502.17796">LAM</a><p>Reviewed alternative; see its paper-ledger row for scope, lesson and decision.</p></div>
+<div class="ref" id="ref-s13"><b>S13</b><a href="https://arxiv.org/abs/2502.20220">Avat3r</a><p>Reviewed alternative; see its paper-ledger row for scope, lesson and decision.</p></div>
+<div class="ref" id="ref-s14"><b>S14</b><a href="https://arxiv.org/abs/2508.19754">FastAvatar</a><p>Reviewed alternative; see its paper-ledger row for scope, lesson and decision.</p></div>
+<div class="ref" id="ref-s15"><b>S15</b><a href="https://arxiv.org/abs/2312.02069">GaussianAvatars</a><p>Reviewed alternative; see its paper-ledger row for scope, lesson and decision.</p></div>
+<div class="ref" id="ref-s16"><b>S16</b><a href="https://ustc3dv.github.io/FlashAvatar/">FlashAvatar</a><p>Reviewed alternative; see its paper-ledger row for scope, lesson and decision.</p></div>
+<div class="ref" id="ref-s17"><b>S17</b><a href="https://neuralbodies.github.io/RFGCA/">Relightable Full-body Gaussian Codec Avatars</a><p>Reviewed alternative; see its paper-ledger row for scope, lesson and decision.</p></div>
+<div class="ref" id="ref-s18"><b>S18</b><a href="https://research.nvidia.com/labs/dair/dream-lift-animate/">Dream, Lift, Animate</a><p>Reviewed alternative; see its paper-ledger row for scope, lesson and decision.</p></div>
+<div class="ref" id="ref-s19"><b>S19</b><a href="https://github.com/zj-dong/MoGA">MoGA</a><p>Reviewed alternative; see its paper-ledger row for scope, lesson and decision.</p></div>
+<div class="ref" id="ref-s20"><b>S20</b><a href="https://github.com/aigc3d/AniGS">AniGS</a><p>Reviewed alternative; see its paper-ledger row for scope, lesson and decision.</p></div>
+<div class="ref" id="ref-s21"><b>S21</b><a href="https://yihalem1.github.io/FlexiAvatar/">FlexiAvatar</a><p>Reviewed alternative; see its paper-ledger row for scope, lesson and decision.</p></div></div>
+  <h3>Implementation references and local reports</h3>
+  <div class="source-grid">
+    <div class="ref"><b>IMPLEMENTATION / UPSTREAM</b><a href="https://github.com/aigc3d/LHM">LHM code</a> · <a href="https://github.com/aigc3d/LHM-plusplus">LHM++ code</a> · <a href="https://github.com/yiyuzhuang/IDOL">IDOL code</a><p>Official implementations; our local provenance records specify the actual revisions used.</p></div>
+    <div class="ref"><b>IMPLEMENTATION / BROWSER</b><a href="https://sparkjs.dev/docs/">Spark</a> · <a href="https://threejs.org/docs/pages/FBXLoader.html">Three.js FBX</a> · <a href="https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker/web_js">MediaPipe</a><p>Rendering, parsing and perception dependencies. Their algorithms are not claimed as ours.</p></div>
+    <div class="ref"><b>LOCAL / MAIN APP</b><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/README.md">Run and exercise the prototype</a> · <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/web/CONTRACTS.md">Portable contracts</a><p>The authoritative asset, deformation, pose and wire definitions.</p></div>
+    <div class="ref"><b>LOCAL / EVIDENCE</b><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/evidence.md">Chronological verification</a> · <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/generation-lab/README.md">Generation-lab execution record</a><p>Read the latest relevant entry; earlier counts and missing-feature notes describe their own snapshots.</p></div>
+    <div class="ref"><b>LOCAL / RESEARCH CONTEXT</b><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/research.md">Wider research atlas</a> · <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/research.md">Mon3tr / VRGaussianAvatar comparison</a><p>Broader reading notes, including survey-only methods not implemented here.</p></div>
+    <div class="ref"><b>LOCAL / NEXT EXPERIMENTS</b><a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/research.md">Generation research plan</a> · <a href="https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/docs/deployment.md">Public-preview runbook</a><p>Remaining evaluation gates and the separately maintained deployment status.</p></div>
+  </div>
+  <h3 id="glossary">Glossary</h3>
+  <dl class="glossary">
+    <dt>Gaussian / splat</dt><dd>An oriented, soft 3D primitive with position, scale, appearance and opacity, projected as an ellipse for rendering.</dd>
+    <dt>Canonical / rest space</dt><dd>The reference configuration in which identity attributes and animation bindings are defined. An exporter must state the exact convention.</dd>
+    <dt>Rig</dt><dd>A skeleton plus the rules and data connecting pose parameters to visible geometry. A rig does not infer motion by itself.</dd>
+    <dt>Skinning / LBS</dt><dd>Linear blend skinning combines joint transforms according to per-point weights.</dd>
+    <dt>FK / IK</dt><dd>Forward kinematics computes joint locations from rotations; inverse kinematics estimates rotations that reach targets.</dd>
+    <dt>Retargeting</dt><dd>Transferring motion between rigs while accounting for rest poses, axes, proportions and supported channels.</dd>
+    <dt>Correctives</dt><dd>Additional pose- or expression-dependent changes beyond basic skinning. Their model-specific meaning must be preserved.</dd>
+    <dt>UV representation</dt><dd>A 2D coordinate layout tied to a body surface, used by some generators to organize features or Gaussian attributes.</dd>
+    <dt>Resolved pose</dt><dd>The complete animation state after input interpretation, shared by rendering, recording and transport.</dd>
+    <dt>Pose Hz / display FPS</dt><dd>New deformation updates per second versus displayed frames per second. They can differ substantially.</dd>
+    <dt>Native parity</dt><dd>Agreement with the originating model’s numerical output within a frozen tolerance—not proof of visual quality or physical correctness.</dd>
+  </dl>
+  <div class="callout"><span class="mini">The architecture in one sentence</span>Use research models to create identity, preserve their animation semantics in a portable asset, convert every controller into the same pose, and let each receiver animate and render locally.</div>
+</section>
+<footer class="footer"><span>Gaussian Avatar Lab · Architecture edition 02<br>Reorganized September 11, 2026 · implementation evidence through September 10<br>Research → decisions → generation → control &amp; animation → transport → evidence</span><a href="#top">Back to top ↑</a></footer>
+</main>
+</div>
+<script>
+(() => {
+  const toc = document.getElementById('toc');
+  const mobileToc = document.getElementById('mobile-toc');
+  mobileToc.innerHTML = Array.from(toc.querySelectorAll('a')).map(a => a.outerHTML).join('');
+  const links = Array.from(document.querySelectorAll('#toc a, #mobile-toc a'));
+  const chapters = Array.from(document.querySelectorAll('section.chapter'));
+  const progress = document.getElementById('reading-progress');
+  let scheduled = false;
+  const update = () => {
+    const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+    progress.style.width = (scrollable > 0 ? Math.min(100, window.scrollY / scrollable * 100) : 0) + '%';
+    let current = chapters[0].id;
+    for (const section of chapters) {
+      if (section.getBoundingClientRect().top <= 150) current = section.id;
+    }
+    for (const link of links) {
+      const active = link.hash === '#' + current;
+      link.classList.toggle('active', active);
+      if (active) link.setAttribute('aria-current', 'location');
+      else link.removeAttribute('aria-current');
+    }
+    scheduled = false;
+  };
+  const schedule = () => { if (!scheduled) { scheduled = true; requestAnimationFrame(update); } };
+  window.addEventListener('scroll', schedule, {passive:true});
+  window.addEventListener('resize', schedule);
+  window.addEventListener('load', schedule);
+  mobileToc.addEventListener('click', event => {
+    if (event.target.closest('a')) document.querySelector('.mobile-nav').open = false;
+  });
+  document.getElementById('print-document').addEventListener('click', () => window.print());
+  let closedBeforePrint = [];
+  let printing = false;
+  window.addEventListener('beforeprint', () => {
+    if (printing) return;
+    printing = true;
+    closedBeforePrint = Array.from(document.querySelectorAll('main details:not([open])'));
+    closedBeforePrint.forEach(detail => { detail.open = true; });
+  });
+  window.addEventListener('afterprint', () => {
+    if (!printing) return;
+    closedBeforePrint.forEach(detail => { detail.open = false; });
+    closedBeforePrint = [];
+    printing = false;
+  });
+  update();
+})();
+</script>
+</body>
+</html>
