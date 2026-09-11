@@ -2,7 +2,7 @@
 
 ## GitHub Pages: static architecture only
 
-The project site is [jamesyong-42.github.io/gaussian-avatar-lab](https://jamesyong-42.github.io/gaussian-avatar-lab/). The source is `docs/index.html`; `.github/workflows/pages.yml` audits source, builds an explicit `_site` allowlist, and deploys it using GitHub's Pages environment.
+The project site is [jamesyong-42.github.io/3d-gaussian-avatar-research](https://jamesyong-42.github.io/3d-gaussian-avatar-research/). The source is `docs/index.html`; `.github/workflows/pages.yml` audits source, builds an explicit `_site` allowlist, and deploys it using GitHub's Pages environment.
 
 For a fork, enable **Settings → Pages → Source: GitHub Actions**, then run **Architecture Pages** or push a documentation change to `main`. Update repository/source URLs in the README, architecture and publication checker when renaming or moving the repo. The original project's Pages configuration is not automatically inherited by forks.
 

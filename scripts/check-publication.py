@@ -17,7 +17,7 @@ PATTERNS = {
     "cloud access key": re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"),
     "private Tailscale identity": re.compile(r"[\w-]+\.tail[\w-]+\.ts\.net", re.I),
 }
-SOURCE_PREFIX = "https://github.com/jamesyong-42/gaussian-avatar-lab/blob/main/"
+SOURCE_PREFIX = "https://github.com/jamesyong-42/3d-gaussian-avatar-research/blob/main/"
 
 
 class Page(HTMLParser):

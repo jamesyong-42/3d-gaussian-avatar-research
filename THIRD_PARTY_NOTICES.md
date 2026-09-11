@@ -18,4 +18,4 @@ FastAPI, Uvicorn, Pillow, NumPy, Requests, TypeScript, Vite, Playwright and GitH
 
 The synthetic demo is original analytic geometry generated from source, not a scan, a learned model output or a redistributed SMPL-X template. Its semantic joint names and array contract are deliberately compatible with the browser control interface. This attribution does not claim that we invented linear blend skinning, Gaussian splatting, IK, quaternion interpolation or FBX retargeting.
 
-The full paper-by-paper attribution and our adoption boundary are in the [architecture review](https://jamesyong-42.github.io/gaussian-avatar-lab/#papers).
+The full paper-by-paper attribution and our adoption boundary are in the [architecture review](https://jamesyong-42.github.io/3d-gaussian-avatar-research/#papers).

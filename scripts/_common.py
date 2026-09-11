@@ -24,7 +24,9 @@ def run(args, **kwargs):
 def in_venv():
     if not PYTHON.is_file():
         raise SystemExit("Run python scripts/setup.py first.")
-    if Path(sys.executable).resolve() != PYTHON.resolve():
+    # On POSIX the venv executable commonly symlinks to the system executable;
+    # interpreter identity is the environment prefix, not the resolved binary.
+    if Path(sys.prefix).resolve() != (ROOT / ".venv").resolve():
         raise SystemExit(subprocess.call([str(PYTHON), *sys.argv], cwd=ROOT))
     sys.path.insert(0, str(WEB / "backend"))
 

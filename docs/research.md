@@ -1,6 +1,6 @@
 # Research decisions and next gates
 
-The [architecture website](https://jamesyong-42.github.io/gaussian-avatar-lab/#papers) is the full, cited 21-paper review: objective, landscape, per-paper lessons, design provenance, generation, animation, transport, evidence and Unity/Meta roadmap. It is a dated research account, not a claim to continuously track the newest paper.
+The [architecture website](https://jamesyong-42.github.io/3d-gaussian-avatar-research/#papers) is the full, cited 21-paper review: objective, landscape, per-paper lessons, design provenance, generation, animation, transport, evidence and Unity/Meta roadmap. It is a dated research account, not a claim to continuously track the newest paper.
 
 ## Current choices
 

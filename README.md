@@ -2,7 +2,7 @@
 
 Photo-to-avatar research, with a browser-first proof of generation, animation and pose transport.
 
-[Read the visual architecture](https://jamesyong-42.github.io/gaussian-avatar-lab/) · [Generation setup](docs/generation.md) · [Technical contracts](web/CONTRACTS.md) · [Evidence & limits](docs/evidence.md)
+[Read the visual architecture](https://jamesyong-42.github.io/3d-gaussian-avatar-research/) · [Generation setup](docs/generation.md) · [Technical contracts](web/CONTRACTS.md) · [Evidence & limits](docs/evidence.md)
 
 This repository turns an exported rigged Gaussian asset into an interactive character: pose it, drive it with head/hand targets, retarget FBX motion, record a performance, and replay it in a second browser. Reconstruction uses upstream **LHM / LHM++**; our work is the model adapters, portable runtime, controls, verification and transport—not a newly trained foundation model or an invented skinning method.
 
@@ -11,8 +11,8 @@ This repository turns an exported rigged Gaussian asset into an interactive char
 Install **Git, Python 3.10+ and Node.js 24 LTS**. Use a desktop Chromium browser with hardware acceleration. The quick start needs no CUDA, model account, personal photos or neural weights.
 
 ```sh
-git clone https://github.com/jamesyong-42/gaussian-avatar-lab.git
-cd gaussian-avatar-lab
+git clone https://github.com/jamesyong-42/3d-gaussian-avatar-research.git
+cd 3d-gaussian-avatar-research
 python scripts/setup.py
 python scripts/serve.py
 ```
@@ -87,6 +87,6 @@ The application binds to **loopback only** and is a single-user research preview
 
 ## Research, attribution and license
 
-See the [21-paper architecture review](https://jamesyong-42.github.io/gaussian-avatar-lab/#papers), [research roadmap](docs/research.md) and [third-party notices](THIRD_PARTY_NOTICES.md). Model, checkpoint, SMPL-X/FLAME, dataset and motion rights are separate. None of those assets are redistributed here.
+See the [21-paper architecture review](https://jamesyong-42.github.io/3d-gaussian-avatar-research/#papers), [research roadmap](docs/research.md) and [third-party notices](THIRD_PARTY_NOTICES.md). Model, checkpoint, SMPL-X/FLAME, dataset and motion rights are separate. None of those assets are redistributed here.
 
 An open-source license for the original project code has **not yet been selected**. Public visibility is not a license grant; see [license status](LICENSE-STATUS.md). Third-party components retain their own terms.
