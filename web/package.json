@@ -13,7 +13,7 @@
   "dependencies": {
     "@mediapipe/tasks-vision": "1.0.1",
     "@sparkjsdev/spark": "2.1.0",
-    "three": "0.185.1"
+    "three": "0.186.1"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
